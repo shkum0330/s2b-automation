@@ -1,0 +1,6 @@
+server:
+  port: 8080
+
+gemini:
+  api:
+    key: AIzaSyCTeTssz182JEb1xA63P10_ALsJ_At_QxY
