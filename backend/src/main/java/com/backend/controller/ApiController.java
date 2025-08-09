@@ -24,6 +24,7 @@ public class ApiController {
             log.info("요청 / {} {}", request.getExample(), request.getModel());
             GenerateResponse response = geminiService.generateSpec(request.getModel(), request.getExample());
             log.info("응답 / 상품명: {}, 규격: {}, 모델명: {}",response.getProductName(),response.getSpecification(),response.getModelName());
+            log.info("응답 / kc: {}, 방송통신기자재: {}",response.getKcCertificationNumber(),response.getKatsCertificationNumber());
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             e.printStackTrace();
