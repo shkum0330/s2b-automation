@@ -21,10 +21,14 @@ public class ApiController {
     @PostMapping("/generate-spec")
     public ResponseEntity<?> generateSpecification(@RequestBody GenerateRequest request) {
         try {
-            log.info("요청 / {} {}", request.getExample(), request.getModel());
-            GenerateResponse response = geminiService.generateSpec(request.getModel(), request.getExample());
-            log.info("응답 / 상품명: {}, 규격: {}, 모델명: {}",response.getProductName(),response.getSpecification(),response.getModelName());
-            log.info("응답 / kc: {}, 방송통신기자재: {}",response.getKcCertificationNumber(),response.getKatsCertificationNumber());
+            log.info("[요청] {} {}", request.getSpecExample(), request.getModel());
+            GenerateResponse response = geminiService.generateSpec(
+                    request.getModel(),
+                    request.getSpecExample(),
+                    request.getProductNameExample() // 추가된 인자
+            );
+            log.info("[응답] / 상품명: {}, 규격: {}, 모델명: {}",response.getProductName(),response.getSpecification(),response.getModelName());
+            log.info("[응답] / kc: {}, 방송통신기자재: {}",response.getKcCertificationNumber(),response.getKatsCertificationNumber());
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             e.printStackTrace();
