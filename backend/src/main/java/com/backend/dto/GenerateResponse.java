@@ -15,4 +15,5 @@ public class GenerateResponse {
     private String manufacturer; // 제조사
     private String countryOfOrigin; // 원산지
     private List<PriceInfo> priceList; // 가격 정보 리스트
+    private String g2bClassificationNumber; // G2B 물품목록번호
 }
