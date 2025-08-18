@@ -1,6 +1,6 @@
 package com.backend.service;
 
-import com.backend.exception.GeminiApiException;
+import com.backend.exception.GenerateApiException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.backend.dto.GenerateResponse;
@@ -61,13 +61,12 @@ public class GeminiService {
                         "**작업 지시**:\n" +
                         "1. **정보 조사**: 대상 모델명('%s')의 실제 정보를 **다음 우선순위에 따라** 조사하세요: **1순위) 제조사 공식 한국어 웹사이트, 2순위) 다나와(danawa.com), 3순위) KC인증정보 검색서비스**. 다른 출처는 신뢰하지 마세요.\n" +
                         "%s" + // 동적으로 생성된 물품명 지시사항
-                        "3. **G2B 물품목록번호 검색**: '나라장터 목록정보시스템'에서 모델명 '%s'의 '물품식별번호'를 찾아주세요. 이것이 'G2B 물품목록번호'입니다. **정보가 없으면 반드시 빈 문자열(\"\")로 값을 설정해야 합니다.**\n" +
-                        "4. **인증번호 정밀 검증**: 해당 모델의 '**국가기술표준원 인증번호**'와 '**KC 전파적합성인증번호**'를 찾되, **반드시 인증 문서에서 조사 대상 모델명('%s')이 명확히 언급되는지 확인해야 합니다.** 관련 없는 번호는 절대 사용하면 안 됩니다. 없으면 무조건 빈 문자열(\"\")로 처리하세요.\n" +
-                        "5. **추가 정보 조사**: '제조사'와 '원산지' 정보를 찾아주세요. 없으면 빈 문자열(\"\")로 처리하세요.\n" +
-                        "6. **가격 정보 수집**: '다나와'와 '네이버쇼핑'에서 **최저가 순으로 최대 10개**의 가격 정보를 찾아, 판매처 이름('storeName'), 가격('price'), 판매 페이지 링크('storeLink')를 수집해주세요. 없으면 빈 배열([])로 처리하세요.\n" +
-                        "7. **규격 생성**: 검증된 정보를 바탕으로, '규격 형식 예시'에 맞춰 '규격'을 생성해주세요.\n" +
-                        "8. **글자 수 제한**: '물품명'은 **40자 이내**, '규격'은 **50자 이내**여야 합니다.\n" +
-                        "9. **최종 출력 형식**: 최종 결과물은 반드시 아래의 JSON 형식으로만 제공해야 하며, 다른 어떤 설명도 붙이지 마세요:\n" +
+                        "2. **인증번호 정밀 검증**: 해당 모델의 '**국가기술표준원 인증번호**'와 '**KC 전파적합성인증번호**'를 찾되, **반드시 인증 문서에서 조사 대상 모델명('%s')이 명확히 언급되는지 확인해야 합니다.** 관련 없는 번호는 절대 사용하면 안 됩니다. 없으면 무조건 빈 문자열(\"\")로 처리하세요.\n" +
+                        "3. **추가 정보 조사**: '제조사'와 '원산지' 정보를 찾아주세요. 원산지의 신뢰도는 제조사가 공식적으로 밝히는 것을 최우선으로 삼고, 거기서 못 찾았으면 많은 쇼핑몰에서 제시하는 것으로 삼아주세요. . 없으면 빈 문자열(\"\")로 처리하세요.\n" +
+                        "4. **가격 정보 수집**: '다나와'와 '네이버쇼핑'에서 **최저가 순으로 최대 10개**의 가격 정보를 찾아, 판매처 이름('storeName'), 가격('price'), 판매 페이지 링크('storeLink')를 수집해주세요. 없으면 빈 배열([])로 처리하세요.\n" +
+                        "5. **규격 생성**: 검증된 정보를 바탕으로, '규격 형식 예시'에 맞춰 '규격'을 생성해주세요.\n" +
+                        "6. **글자 수 제한**: '물품명'은 **40자 이내**, '규격'은 **50자 이내**여야 합니다.\n" +
+                        "7. **최종 출력 형식**: 최종 결과물은 반드시 아래의 JSON 형식으로만 제공해야 하며, 다른 어떤 설명도 붙이지 마세요:\n" +
                         "{\"productName\":\"생성된 물품명\",\"specification\":\"생성된 규격\",\"modelName\":\"%s\",\"katsCertificationNumber\":\"찾아낸 전기안전인증번호\",\"kcCertificationNumber\":\"찾아낸 전파적합성인증번호\",\"manufacturer\":\"찾아낸 제조사\",\"countryOfOrigin\":\"찾아낸 원산지\",\"priceList\":[],\"g2bClassificationNumber\":\"찾아낸 G2B 물품목록번호\"}",
                 model, promptHeader, model, productNameInstruction, model, model, model
         );
@@ -83,9 +82,9 @@ public class GeminiService {
             String generatedText = extractGeneratedText(jsonResponse);
             return objectMapper.readValue(generatedText, GenerateResponse.class);
         } catch (HttpServerErrorException.ServiceUnavailable e) {
-            throw new GeminiApiException("Gemini API가 과부하 상태입니다. 잠시 후 다시 시도해주세요.");
+            throw new GenerateApiException("Gemini API가 과부하 상태입니다. 잠시 후 다시 시도해주세요.");
         } catch (JsonProcessingException e) {
-            throw new GeminiApiException("AI가 생성한 응답의 형식이 잘못되었습니다.");
+            throw new GenerateApiException("AI가 생성한 응답의 형식이 잘못되었습니다.");
         }
     }
 

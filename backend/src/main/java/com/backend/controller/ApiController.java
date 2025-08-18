@@ -25,7 +25,7 @@ public class ApiController {
             GenerateResponse response = geminiService.generateSpec(
                     request.getModel(),
                     request.getSpecExample(),
-                    request.getProductNameExample() // 추가된 인자
+                    request.getProductNameExample()
             );
             log.info("[응답] / 상품명: {}, 규격: {}, 모델명: {}",response.getProductName(),response.getSpecification(),response.getModelName());
             log.info("[응답] / kc: {}, 방송통신기자재: {}",response.getKcCertificationNumber(),response.getKatsCertificationNumber());
