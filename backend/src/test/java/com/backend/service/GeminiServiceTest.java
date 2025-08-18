@@ -2,7 +2,6 @@ package com.backend.service;
 
 import com.backend.dto.GenerateResponse;
 import com.backend.dto.PriceInfo;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -19,7 +18,7 @@ class GeminiServiceTest {
     @DisplayName("서비스 입출력 로깅 테스트")
     void ioTest() {
         log.info("--- 1. 테스트 입력값 설정 ---");
-        String model = "삼성전자 블루스카이 3100 공기청정기";
+        String model = "AX033B310GBD";
         String specExample = "10평형(33㎡) / 집진(헤파)필터 / 초미세먼지제거 / 탈취 / 제균";
         String productNameExample = "삼성전자 블루스카이 3100 공기청정기";
         log.info("Model: {}", model);

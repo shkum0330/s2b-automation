@@ -4,6 +4,7 @@ import com.backend.exception.GeminiApiException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.backend.dto.GenerateResponse;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -18,6 +19,7 @@ import java.util.Map;
 import java.util.Optional;
 
 @Service
+@RequiredArgsConstructor
 public class GeminiService {
     @Value("${gemini.api.url}")
     private String apiUrl;
@@ -60,7 +62,7 @@ public class GeminiService {
                         "1. **정보 조사**: 대상 모델명('%s')의 실제 정보를 **다음 우선순위에 따라** 조사하세요: **1순위) 제조사 공식 한국어 웹사이트, 2순위) 다나와(danawa.com), 3순위) KC인증정보 검색서비스**. 다른 출처는 신뢰하지 마세요.\n" +
                         "%s" + // 동적으로 생성된 물품명 지시사항
                         "3. **G2B 물품목록번호 검색**: '나라장터 목록정보시스템'에서 모델명 '%s'의 '물품식별번호'를 찾아주세요. 이것이 'G2B 물품목록번호'입니다. **정보가 없으면 반드시 빈 문자열(\"\")로 값을 설정해야 합니다.**\n" +
-                        "4. **인증번호 정밀 검증**: 웹사이트에서 '**안전인증번호**'나 '**전파적합성인증번호**'를 찾되, **반드시 인증 문서에서 조사 대상 모델명('%s')이 명확히 언급되는지 확인해야 합니다.** 관련 없는 번호는 절대 사용하면 안 됩니다. 없으면 무조건 빈 문자열(\"\")로 처리하세요.\n" +
+                        "4. **인증번호 정밀 검증**: 해당 모델의 '**국가기술표준원 인증번호**'와 '**KC 전파적합성인증번호**'를 찾되, **반드시 인증 문서에서 조사 대상 모델명('%s')이 명확히 언급되는지 확인해야 합니다.** 관련 없는 번호는 절대 사용하면 안 됩니다. 없으면 무조건 빈 문자열(\"\")로 처리하세요.\n" +
                         "5. **추가 정보 조사**: '제조사'와 '원산지' 정보를 찾아주세요. 없으면 빈 문자열(\"\")로 처리하세요.\n" +
                         "6. **가격 정보 수집**: '다나와'와 '네이버쇼핑'에서 **최저가 순으로 최대 10개**의 가격 정보를 찾아, 판매처 이름('storeName'), 가격('price'), 판매 페이지 링크('storeLink')를 수집해주세요. 없으면 빈 배열([])로 처리하세요.\n" +
                         "7. **규격 생성**: 검증된 정보를 바탕으로, '규격 형식 예시'에 맞춰 '규격'을 생성해주세요.\n" +
