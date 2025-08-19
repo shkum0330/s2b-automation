@@ -1,6 +1,16 @@
 server:
   port: 8080
 
+spring:
+  config:
+    import: env.yml
+
 gemini:
   api:
-    key: AIzaSyCTeTssz182JEb1xA63P10_ALsJ_At_QxY
+    url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent
+    key: ${GEMINI_API_KEY}
+
+chatgpt:
+  api:
+    url: https://api.openai.com/v1/chat/completions
+    key: ${CHATGPT_API_KEY}
