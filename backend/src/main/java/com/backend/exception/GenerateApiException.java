@@ -8,4 +8,7 @@ public class GenerateApiException extends RuntimeException {
     public GenerateApiException(String message) {
         super(message);
     }
+    public GenerateApiException(String message, Throwable cause) {
+        super(message, cause);
+    }
 }

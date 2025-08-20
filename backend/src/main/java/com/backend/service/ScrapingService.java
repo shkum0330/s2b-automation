@@ -10,6 +10,7 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
@@ -28,7 +29,7 @@ public class ScrapingService {
 
     private final Random random = new Random();
 
-    public String findG2bClassificationNumber(String modelName) {
+    public Optional<String> findG2bClassificationNumber(String modelName) {
         try {
             TimeUnit.MILLISECONDS.sleep(1000 + random.nextInt(2000));
 
@@ -50,7 +51,7 @@ public class ScrapingService {
 
             if (firstResultItem == null) {
                 log.info("검색 결과가 없습니다. (모델명: {})", modelName);
-                return "";
+                return Optional.empty();
             }
 
             // 2. 해당 블록 내에 하이라이트 태그(<span class="searchKeyword">)로 올바른 물품인지 확인
@@ -66,21 +67,21 @@ public class ScrapingService {
                     if (numberParts.length == 2) {
                         String lastEightDigits = numberParts[1]; // "24574852"
                         log.info("스크래핑 성공: 전체 번호 '{}'에서 마지막 8자리 '{}'를 추출했습니다.", fullNumberText, lastEightDigits);
-                        return lastEightDigits;
+                        return Optional.of(lastEightDigits);
                     }
                 }
             }
 
             log.info("첫번째 검색 결과에 하이라이트된 검색어가 없어 값을 가져오지 않습니다. (모델명: {})", modelName);
-            return "";
+            return Optional.empty();
 
         } catch (InterruptedException e) {
             log.warn("스크래핑 지연 중 스레드 인터럽트 발생", e);
             Thread.currentThread().interrupt();
-            return "";
+            return Optional.empty();
         } catch (Exception e) {
             log.error("G2B 스크래핑 중 오류가 발생했습니다. (모델명: {})", modelName, e);
-            return "";
+            return Optional.empty();
         }
     }
 }

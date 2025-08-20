@@ -4,6 +4,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -21,11 +22,11 @@ class ScrapingServiceTest {
         String expectedNumber = "24574852";
 
         // when
-        String actualNumber = scrapingService.findG2bClassificationNumber(modelName);
+        Optional<String> actualNumberOpt = scrapingService.findG2bClassificationNumber(modelName);
 
         // then
-        assertNotNull(actualNumber, "결과 값은 null이 아니어야 합니다.");
-        assertEquals(expectedNumber, actualNumber, "실제 스크래핑 결과가 예상 값과 일치해야 합니다.");
+        assertTrue(actualNumberOpt.isPresent(), "결과값이 존재해야 합니다.");
+        assertEquals(expectedNumber, actualNumberOpt.get(), "실제 스크래핑 결과가 예상 값과 일치해야 합니다.");
     }
 
     @Test
@@ -35,10 +36,9 @@ class ScrapingServiceTest {
         String modelName = "THIS_MODEL_NAME_DOES_NOT_EXIST_XYZ123";
 
         // when
-        String actualNumber = scrapingService.findG2bClassificationNumber(modelName);
+        Optional<String> actualNumberOpt = scrapingService.findG2bClassificationNumber(modelName);
 
         // then
-        assertNotNull(actualNumber, "결과 값은 null이 아니어야 합니다.");
-        assertEquals("", actualNumber, "존재하지 않는 모델명 검색 시 빈 문자열을 반환해야 합니다.");
+        assertFalse(actualNumberOpt.isPresent(), "존재하지 않는 모델명 검색 시 결과가 비어있어야 합니다.");
     }
 }

@@ -14,6 +14,7 @@ import org.springframework.web.client.RestTemplate;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.Executor;
 
 @Service
 @Primary
@@ -23,8 +24,8 @@ public class ChatGptService extends AbstractGenerationService{
     @Value("${chatgpt.api.key}")
     private String apiKey;
 
-    public ChatGptService(ScrapingService scrapingService, PromptBuilder promptBuilder, ObjectMapper objectMapper, RestTemplate restTemplate) {
-        super(scrapingService, promptBuilder, objectMapper, restTemplate);
+    public ChatGptService(ScrapingService scrapingService, PromptBuilder promptBuilder, ObjectMapper objectMapper, RestTemplate restTemplate, Executor taskExecutor) {
+        super(scrapingService, promptBuilder, objectMapper, restTemplate, taskExecutor);
     }
 
     @Override

@@ -13,6 +13,7 @@ import org.springframework.web.client.RestTemplate;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.Executor;
 
 @Service
 public class GeminiService extends AbstractGenerationService {
@@ -21,8 +22,8 @@ public class GeminiService extends AbstractGenerationService {
     @Value("${gemini.api.key}")
     private String apiKey;
 
-    public GeminiService(ScrapingService scrapingService, PromptBuilder promptBuilder, ObjectMapper objectMapper, RestTemplate restTemplate) {
-        super(scrapingService, promptBuilder, objectMapper, restTemplate);
+    public GeminiService(ScrapingService scrapingService, PromptBuilder promptBuilder, ObjectMapper objectMapper, RestTemplate restTemplate, Executor taskExecutor) {
+        super(scrapingService, promptBuilder, objectMapper, restTemplate, taskExecutor);
     }
 
     @Override
