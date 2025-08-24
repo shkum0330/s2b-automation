@@ -22,22 +22,40 @@ public class GeminiService extends AbstractGenerationService {
     @Value("${gemini.api.key}")
     private String apiKey;
 
+
     public GeminiService(ScrapingService scrapingService, PromptBuilder promptBuilder, ObjectMapper objectMapper, RestTemplate restTemplate, Executor taskExecutor) {
         super(scrapingService, promptBuilder, objectMapper, restTemplate, taskExecutor);
     }
+
 
     @Override
     protected String getApiUrl() {
         return apiUrl + "?key=" + apiKey;
     }
 
+
     @Override
     protected HttpEntity<Map<String, Object>> createRequestEntity(String prompt) {
-        Map<String, Object> requestBody = Map.of("contents", List.of(Map.of("parts", List.of(Map.of("text", prompt)))));
+        Map<String, Object> generationConfig = Map.of(
+                "temperature", 0,
+                "topP", 0,
+                "response_mime_type", "application/json"
+        );
+
+        Map<String, Object> requestBody = Map.of(
+                "contents", List.of(Map.of(
+                        "role", "user",
+                        "parts", List.of(Map.of("text", prompt))
+                )),
+                "generationConfig", generationConfig
+        );
+
+
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         return new HttpEntity<>(requestBody, headers);
     }
+
 
     @Override
     protected String extractTextFromResponse(String jsonResponse) throws Exception {
@@ -50,6 +68,7 @@ public class GeminiService extends AbstractGenerationService {
                 .map(t -> t.replace("```json", "").replace("```", "").trim())
                 .orElseThrow(() -> new Exception("Gemini 응답에서 텍스트를 추출할 수 없습니다."));
     }
+
 
     @Override
     protected String getApiName() {
