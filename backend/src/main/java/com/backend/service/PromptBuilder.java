@@ -29,20 +29,13 @@ public class PromptBuilder {
         [제조사·원산지 규칙]
         - 제조사 공식 표기를 최우선으로 사용. 없으면 다나와/다수 쇼핑몰 교차검증. 불명확하면 빈 문자열("").
         
-        
-        [가격 수집 규칙]
-        - 출처는 다나와/네이버쇼핑만. 신품·국내 정식 유통·재고 있음·쿠폰/행사 제외 실구매가.
-        - 중고/해외직구/품절/광고/번들 제외. 최대 10개, 가격 오름차순. 동일 판매처명은 1개만.
-        - storeName=판매자명, price=숫자만(₩·쉼표 제거), storeLink=상품 상세 URL.
-        
-        
         [출력 규칙 및 자기검증]
         - productName은 모델명 미포함, 40자 이내. specification은 50자 이내.
         - manufacturer를 먼저 결정하고, productName은 반드시 manufacturer로 시작해야 함.
         예) "LG전자 ... 공기청정기" / "삼성전자 ... 공기청정기" / manufacturer가 빈 문자열이면 productName도 빈 문자열.
         - 예시의 브랜드/시리즈명은 스타일 참고용일 뿐, 절대 복사하지 말 것.
         - specification은 허용 출처에서 확인된 항목만 사용(미확인 스펙은 누락). 구분자는 " / " 유지.
-        - 어떤 항목이든 확증 불가 시 빈 문자열("") 또는 빈 배열([])로 반환.
+        - 어떤 항목이든 확증 불가 시 빈 문자열("")로 반환.
         - 반드시 JSON만 출력(부가 설명 금지).
         
         
@@ -60,7 +53,7 @@ public class PromptBuilder {
         6) 최종 출력: 아래 JSON만 반환.
         
         
-        {"productName":"생성된 물품명","specification":"생성된 규격","modelName":"%s","katsCertificationNumber":"찾아낸 전기안전인증번호","kcCertificationNumber":"찾아낸 전파적합성인증번호","manufacturer":"찾아낸 제조사","countryOfOrigin":"찾아낸 원산지","priceList":[]}
+        {"productName":"생성된 물품명","specification":"생성된 규격","modelName":"%s","katsCertificationNumber":"찾아낸 전기안전인증번호","kcCertificationNumber":"찾아낸 전파적합성인증번호","manufacturer":"찾아낸 제조사","countryOfOrigin":"찾아낸 원산지"}
         """;
 
 
