@@ -33,29 +33,28 @@ public class GeminiService extends AbstractGenerationService {
         return apiUrl + "?key=" + apiKey;
     }
 
-
     @Override
     protected HttpEntity<Map<String, Object>> createRequestEntity(String prompt) {
         // 1. generationConfig 맵 수정
         Map<String, Object> generationConfig = Map.of(
-                "temperature", 0,
+                "temperature", 0.3,
                 // "topP", 0.95,
                 "maxOutputTokens", 65536,
                 "response_mime_type", "application/json"
         );
 
-        // 2. tools 파라미터 추가 (Grounding with Google Search 활성화)
-        Map<String, Object> googleSearchTool = Map.of(
-                "google_search_retrieval", Map.of()
-        );
+//        // 2. tools 파라미터 추가 (Grounding with Google Search 활성화)
+//        Map<String, Object> googleSearchTool = Map.of(
+//                "google_search_retrieval", Map.of()
+//        );
 
         Map<String, Object> requestBody = Map.of(
                 "contents", List.of(Map.of(
                         "role", "user",
                         "parts", List.of(Map.of("text", prompt))
                 )),
-                "generationConfig", generationConfig,
-                "tools", List.of(googleSearchTool) // (추가)
+                "generationConfig", generationConfig
+//                "tools", List.of(googleSearchTool) // (추가)
         );
 
 

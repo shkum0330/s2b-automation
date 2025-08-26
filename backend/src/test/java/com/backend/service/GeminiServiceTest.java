@@ -41,19 +41,6 @@ class GeminiServiceTest {
                 log.info("제조사: {}", response.getManufacturer());
                 log.info("원산지: {}", response.getCountryOfOrigin());
                 log.info("G2B 물품목록번호: {}", response.getG2bClassificationNumber());
-                // 가격 정보 리스트를 하나씩 순회하며 출력
-                if (response.getPriceList() != null && !response.getPriceList().isEmpty()) {
-                    log.info("priceList:");
-                    int count = 1;
-                    for (PriceInfo price : response.getPriceList()) {
-                        log.info("  {}. storeName: {}", count, price.getStoreName());
-                        log.info("     price: {}", price.getPrice());
-                        log.info("     storeLink: {}", price.getStoreLink());
-                        count++;
-                    }
-                } else {
-                    log.info("priceList: (정보 없음)");
-                }
             } else {
                 log.warn("응답 객체가 null입니다.");
             }
