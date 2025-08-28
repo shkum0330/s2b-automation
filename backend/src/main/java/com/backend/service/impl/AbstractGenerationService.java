@@ -1,6 +1,6 @@
 package com.backend.service.impl;
 
-import com.backend.dto.CertificationResponse;
+// CertificationResponse import 제거
 import com.backend.dto.GenerateResponse;
 import com.backend.exception.GenerateApiException;
 import com.backend.service.GenerationService;
@@ -14,15 +14,13 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.RestTemplate;
+
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
-import java.util.Map;
 
-// 템플릿 메서드 패턴
-// 생성자 주입을 원하는 공통 빈들을 여기에 모음
 @RequiredArgsConstructor
 @Slf4j
 public abstract class AbstractGenerationService implements GenerationService {
@@ -34,25 +32,24 @@ public abstract class AbstractGenerationService implements GenerationService {
 
     @Override
     public GenerateResponse generateSpec(String model, String specExample, String productNameExample) throws GenerateApiException {
-        // 1. 세 개의 독립적인 작업을 비동기로 정의
         CompletableFuture<Optional<String>> g2bFuture = CompletableFuture.supplyAsync(
                 () -> scrapingService.findG2bClassificationNumber(model), taskExecutor);
 
-        CompletableFuture<CertificationResponse> certFuture = CompletableFuture.supplyAsync(
+        // certFuture의 반환 타입을 GenerateResponse로 변경
+        CompletableFuture<GenerateResponse> certFuture = CompletableFuture.supplyAsync(
                 () -> fetchCertification(model), taskExecutor);
 
         CompletableFuture<GenerateResponse> mainSpecFuture = CompletableFuture.supplyAsync(
                 () -> fetchMainSpec(model, specExample, productNameExample), taskExecutor);
 
-        // 2. 모든 비동기 작업이 완료될 때까지 대기
         try {
             CompletableFuture.allOf(g2bFuture, certFuture, mainSpecFuture).join();
 
-            // 3. 각 작업의 결과를 가져와 최종 응답 객체에 통합
             GenerateResponse finalResponse = mainSpecFuture.get();
-            CertificationResponse certResponse = certFuture.get();
+            GenerateResponse certResponse = certFuture.get(); // 이제 GenerateResponse 타입
             Optional<String> g2bOpt = g2bFuture.get();
 
+            // certResponse에서 얻은 인증번호 정보를 finalResponse에 병합
             finalResponse.setKatsCertificationNumber(certResponse.getKatsCertificationNumber());
             finalResponse.setKcCertificationNumber(certResponse.getKcCertificationNumber());
             g2bOpt.ifPresent(finalResponse::setG2bClassificationNumber);
@@ -70,22 +67,23 @@ public abstract class AbstractGenerationService implements GenerationService {
         }
     }
 
-    // 인증번호 조회 로직을 별도 메서드로 분리
-    private CertificationResponse fetchCertification(String model) {
+    private GenerateResponse fetchCertification(String model) {
         try {
             String prompt = promptBuilder.buildCertificationPrompt(model);
+            log.info(prompt);
             HttpEntity<Map<String, Object>> requestEntity = createRequestEntity(prompt);
             String apiUrl = getApiUrl();
             ResponseEntity<String> response = restTemplate.postForEntity(apiUrl, requestEntity, String.class);
             String generatedText = extractTextFromResponse(response.getBody());
-            return objectMapper.readValue(generatedText, CertificationResponse.class);
+//            log.info("{}의 생성된 인증번호 대답: {}", model, generatedText);
+            // objectMapper가 JSON을 GenerateResponse 객체로 변환하도록 수정
+            return objectMapper.readValue(generatedText, GenerateResponse.class);
         } catch (Exception e) {
             log.warn("인증번호 조회 중 오류 발생 (모델: {}): {}", model, e.getMessage());
-            return new CertificationResponse(); // 실패 시 빈 객체 반환
+            return new GenerateResponse(); // 실패 시 빈 GenerateResponse 객체 반환
         }
     }
 
-    // 메인 정보 조회 로직을 별도 메서드로 분리
     private GenerateResponse fetchMainSpec(String model, String specExample, String productNameExample) {
         try {
             String prompt = promptBuilder.buildProductSpecPrompt(model, specExample, productNameExample);

@@ -1,6 +1,5 @@
 package com.backend.service;
 
-import com.backend.dto.CertificationResponse;
 import com.backend.dto.GenerateResponse;
 
 public interface GenerationService {

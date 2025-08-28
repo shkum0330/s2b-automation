@@ -15,7 +15,7 @@ class ScrapingServiceTest {
     private ScrapingService scrapingService;
 
     @Test
-    @DisplayName("통합 테스트 성공: 실제 스크래핑으로 물품목록번호를 가져온다")
+    @DisplayName("테스트 성공: 실제 스크래핑으로 물품목록번호를 가져온다")
     void givenModelName_whenScrapingRealWebsite_thenReturnsCorrectNumber() {
         // given
         String modelName = "AX033B310GBD";
@@ -30,7 +30,7 @@ class ScrapingServiceTest {
     }
 
     @Test
-    @DisplayName("통합 테스트 실패: 존재하지 않는 모델명으로 검색 시 빈 문자열을 반환한다")
+    @DisplayName("테스트 실패: 존재하지 않는 모델명으로 검색 시 빈 문자열을 반환한다")
     void givenNonExistentModelName_whenScraping_thenReturnsEmptyString() {
         // given
         String modelName = "THIS_MODEL_NAME_DOES_NOT_EXIST_XYZ123";
