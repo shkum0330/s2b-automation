@@ -4,6 +4,7 @@ import com.backend.service.PromptBuilder;
 import com.backend.service.ScrapingService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Primary;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -16,6 +17,7 @@ import java.util.Optional;
 import java.util.concurrent.Executor;
 
 @Service
+@Primary
 public class GeminiService extends AbstractGenerationService {
     @Value("${gemini.api.url}")
     private String apiUrl;

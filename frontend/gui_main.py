@@ -1,5 +1,6 @@
 import sys
 import requests
+import pyperclip
 from PyQt5.QtWidgets import (QApplication, QWidget, QLabel, QLineEdit,
                              QTextEdit, QPushButton, QVBoxLayout, QGroupBox,
                              QGridLayout, QMessageBox, QTableWidget, QTableWidgetItem, QHeaderView)
@@ -58,23 +59,43 @@ class S2BApp(QWidget):
         self.status_label.setStyleSheet("color: gray;")
 
         response_group = QGroupBox("3. 서버로부터 받은 결과 (GenerateResponse)")
-        self.product_name_output = QLineEdit()
-        self.product_name_output.setReadOnly(True)
-        self.spec_output = QTextEdit()
-        self.spec_output.setReadOnly(True)
-        self.spec_output.setFixedHeight(80)
-        self.model_name_output = QLineEdit()
-        self.model_name_output.setReadOnly(True)
-        self.manufacturer_output = QLineEdit()
-        self.manufacturer_output.setReadOnly(True)
-        self.origin_output = QLineEdit()
-        self.origin_output.setReadOnly(True)
-        self.g2b_output = QLineEdit()
-        self.g2b_output.setReadOnly(True)
-        self.kats_cert_output = QLineEdit()
-        self.kats_cert_output.setReadOnly(True)
-        self.kc_cert_output = QLineEdit()
-        self.kc_cert_output.setReadOnly(True)
+
+        # 출력 필드와 복사 버튼들을 딕셔너리로 관리
+        self.output_fields = {}
+        self.copy_buttons = {}
+
+        # 필드 정의 (라벨, 출력 위젯 타입)
+        fields_info = [
+            ("productName", QLineEdit),
+            ("specification", QTextEdit),
+            ("modelName", QLineEdit),
+            ("manufacturer", QLineEdit),
+            ("countryOfOrigin", QLineEdit),
+            ("g2bClassificationNumber", QLineEdit),
+            ("katsCertificationNumber", QLineEdit),
+            ("kcCertificationNumber", QLineEdit),
+        ]
+
+        res_layout = QGridLayout()
+        for i, (field_name, widget_type) in enumerate(fields_info):
+            label = QLabel(f"{field_name}:")
+            output_widget = widget_type()
+            output_widget.setReadOnly(True)
+            if widget_type == QTextEdit:
+                output_widget.setFixedHeight(80)
+
+            copy_button = QPushButton("복사")
+            copy_button.clicked.connect(lambda _, text_widget=output_widget: self.copy_to_clipboard(text_widget))
+            copy_button.setFixedWidth(50)  # 버튼 너비 조정
+
+            self.output_fields[field_name] = output_widget
+            self.copy_buttons[field_name] = copy_button
+
+            res_layout.addWidget(label, i, 0, Qt.AlignTop if widget_type == QTextEdit else Qt.AlignLeft)
+            res_layout.addWidget(output_widget, i, 1)
+            res_layout.addWidget(copy_button, i, 2)
+
+        response_group.setLayout(res_layout)
 
         req_layout = QGridLayout()
         req_layout.addWidget(model_label, 0, 0)
@@ -90,25 +111,6 @@ class S2BApp(QWidget):
         action_layout.addWidget(self.status_label)
         action_group.setLayout(action_layout)
 
-        res_layout = QGridLayout()
-        res_layout.addWidget(QLabel("productName:"), 0, 0)
-        res_layout.addWidget(self.product_name_output, 0, 1)
-        res_layout.addWidget(QLabel("specification:"), 1, 0, Qt.AlignTop)
-        res_layout.addWidget(self.spec_output, 1, 1)
-        res_layout.addWidget(QLabel("modelName:"), 2, 0)
-        res_layout.addWidget(self.model_name_output, 2, 1)
-        res_layout.addWidget(QLabel("manufacturer:"), 3, 0)
-        res_layout.addWidget(self.manufacturer_output, 3, 1)
-        res_layout.addWidget(QLabel("countryOfOrigin:"), 4, 0)
-        res_layout.addWidget(self.origin_output, 4, 1)
-        res_layout.addWidget(QLabel("g2bClassificationNumber:"), 5, 0)
-        res_layout.addWidget(self.g2b_output, 5, 1)
-        res_layout.addWidget(QLabel("katsCertificationNumber:"), 6, 0)
-        res_layout.addWidget(self.kats_cert_output, 6, 1)
-        res_layout.addWidget(QLabel("kcCertificationNumber:"), 7, 0)
-        res_layout.addWidget(self.kc_cert_output, 7, 1)
-        response_group.setLayout(res_layout)
-
         main_layout = QVBoxLayout(self)
         main_layout.addWidget(request_group)
         main_layout.addWidget(action_group)
@@ -116,7 +118,7 @@ class S2BApp(QWidget):
 
         self.run_button.clicked.connect(self.start_api_call)
         self.setWindowTitle("S2B 상품 정보 AI 생성기")
-        self.setGeometry(300, 300, 600, 650)  # 창 높이 조정
+        self.setGeometry(300, 300, 700, 700)  # 창 크기 조정 (너비 늘림)
         self.show()
 
     def start_api_call(self):
@@ -142,15 +144,12 @@ class S2BApp(QWidget):
             self.status_label.setText("상태: ✅ AI 생성 완료!")
             self.status_label.setStyleSheet("color: green;")
 
-            self.product_name_output.setText(result.get('productName', ''))
-            self.spec_output.setText(result.get('specification', ''))
-            self.model_name_output.setText(result.get('modelName', ''))
-            self.manufacturer_output.setText(result.get('manufacturer', ''))
-            self.origin_output.setText(result.get('countryOfOrigin', ''))
-            self.g2b_output.setText(result.get('g2bClassificationNumber', ''))
-            self.kats_cert_output.setText(result.get('katsCertificationNumber', ''))
-            self.kc_cert_output.setText(result.get('kcCertificationNumber', ''))
-
+            for field_name, output_widget in self.output_fields.items():
+                text_value = str(result.get(field_name, ''))
+                if isinstance(output_widget, QLineEdit):
+                    output_widget.setText(text_value)
+                elif isinstance(output_widget, QTextEdit):
+                    output_widget.setText(text_value)
         else:
             self.status_label.setText(f"상태: ❌ {result}")
             self.status_label.setStyleSheet("color: red;")
@@ -159,14 +158,22 @@ class S2BApp(QWidget):
         self.run_button.setEnabled(True)
 
     def clear_outputs(self):
-        self.product_name_output.clear()
-        self.spec_output.clear()
-        self.model_name_output.clear()
-        self.manufacturer_output.clear()
-        self.origin_output.clear()
-        self.g2b_output.clear()
-        self.kats_cert_output.clear()
-        self.kc_cert_output.clear()
+        for output_widget in self.output_fields.values():
+            if isinstance(output_widget, QLineEdit):
+                output_widget.clear()
+            elif isinstance(output_widget, QTextEdit):
+                output_widget.clear()
+
+    def copy_to_clipboard(self, text_widget):
+        text_to_copy = ""
+        if isinstance(text_widget, QLineEdit):
+            text_to_copy = text_widget.text()
+        elif isinstance(text_widget, QTextEdit):
+            text_to_copy = text_widget.toPlainText()
+
+        # 내용이 있을 때만 pyperclip을 사용하여 클립보드에 복사합니다.
+        if text_to_copy:
+            pyperclip.copy(text_to_copy)
 
 
 if __name__ == '__main__':
