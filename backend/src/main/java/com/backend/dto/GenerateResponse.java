@@ -16,4 +16,10 @@ public class GenerateResponse {
     private String countryOfOrigin; // 원산지
 //    private List<PriceInfo> priceList; // 가격 정보 리스트
     private String g2bClassificationNumber; // G2B 물품목록번호
+
+    public void setCertificationNumber(CertificationResponse certificationResponse) {
+        this.katsCertificationNumber = certificationResponse.getKatsCertificationNumber();
+        this.kcCertificationNumber = certificationResponse.getKcCertificationNumber();
+    }
+
 }

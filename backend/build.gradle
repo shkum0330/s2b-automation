@@ -2,6 +2,7 @@ plugins {
     id 'java'
     id 'org.springframework.boot' version '3.5.4'
     id 'io.spring.dependency-management' version '1.1.7'
+    id 'org.asciidoctor.jvm.convert' version '3.3.2'
 }
 
 group = 'com'
@@ -23,6 +24,8 @@ repositories {
     mavenCentral()
 }
 
+def snippetsDir = file("build/generated-snippets")
+
 dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-web'
     compileOnly 'org.projectlombok:lombok'
@@ -32,8 +35,35 @@ dependencies {
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     testCompileOnly 'org.projectlombok:lombok'
     testAnnotationProcessor 'org.projectlombok:lombok'
+    testImplementation 'org.springframework.restdocs:spring-restdocs-mockmvc'
 }
 
 tasks.named('test') {
+    outputs.dir snippetsDir
     useJUnitPlatform()
+}
+
+tasks.named('asciidoctor') {
+    inputs.dir snippetsDir
+    dependsOn tasks.named('test')
+
+    attributes(
+            'snippets': snippetsDir
+    )
+
+    doFirst {
+        delete file('src/main/resources/static/docs')
+    }
+
+    copy {
+        from "build/docs/asciidoc"
+        into "src/main/resources/static/docs"
+    }
+}
+
+bootJar {
+    dependsOn asciidoctor
+    from(asciidoctor.outputDir) {
+        into 'static/docs'
+    }
 }

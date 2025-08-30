@@ -1,6 +1,7 @@
 package com.backend.service.impl;
 
 // CertificationResponse import 제거
+import com.backend.dto.CertificationResponse;
 import com.backend.dto.GenerateResponse;
 import com.backend.exception.GenerateApiException;
 import com.backend.service.GenerationService;
@@ -36,7 +37,7 @@ public abstract class AbstractGenerationService implements GenerationService {
                 () -> scrapingService.findG2bClassificationNumber(model), taskExecutor);
 
         // certFuture의 반환 타입을 GenerateResponse로 변경
-        CompletableFuture<GenerateResponse> certFuture = CompletableFuture.supplyAsync(
+        CompletableFuture<CertificationResponse> certFuture = CompletableFuture.supplyAsync(
                 () -> fetchCertification(model), taskExecutor);
 
         CompletableFuture<GenerateResponse> mainSpecFuture = CompletableFuture.supplyAsync(
@@ -45,16 +46,14 @@ public abstract class AbstractGenerationService implements GenerationService {
         try {
             CompletableFuture.allOf(g2bFuture, certFuture, mainSpecFuture).join();
 
-            GenerateResponse finalResponse = mainSpecFuture.get();
-            GenerateResponse certResponse = certFuture.get(); // 이제 GenerateResponse 타입
+            GenerateResponse response = mainSpecFuture.get();
+            CertificationResponse cert = certFuture.get();
             Optional<String> g2bOpt = g2bFuture.get();
 
-            // certResponse에서 얻은 인증번호 정보를 finalResponse에 병합
-            finalResponse.setKatsCertificationNumber(certResponse.getKatsCertificationNumber());
-            finalResponse.setKcCertificationNumber(certResponse.getKcCertificationNumber());
-            g2bOpt.ifPresent(finalResponse::setG2bClassificationNumber);
+            response.setCertificationNumber(cert);
+            g2bOpt.ifPresent(response::setG2bClassificationNumber);
 
-            return finalResponse;
+            return response;
 
         } catch (CompletionException e) {
             Throwable cause = e.getCause();
@@ -67,7 +66,7 @@ public abstract class AbstractGenerationService implements GenerationService {
         }
     }
 
-    private GenerateResponse fetchCertification(String model) {
+    private CertificationResponse fetchCertification(String model) {
         try {
             String prompt = promptBuilder.buildCertificationPrompt(model);
             log.info(prompt);
@@ -77,10 +76,10 @@ public abstract class AbstractGenerationService implements GenerationService {
             String generatedText = extractTextFromResponse(response.getBody());
 //            log.info("{}의 생성된 인증번호 대답: {}", model, generatedText);
             // objectMapper가 JSON을 GenerateResponse 객체로 변환하도록 수정
-            return objectMapper.readValue(generatedText, GenerateResponse.class);
+            return objectMapper.readValue(generatedText, CertificationResponse.class);
         } catch (Exception e) {
             log.warn("인증번호 조회 중 오류 발생 (모델: {}): {}", model, e.getMessage());
-            return new GenerateResponse(); // 실패 시 빈 GenerateResponse 객체 반환
+            return new CertificationResponse(); // 실패 시 빈 GenerateResponse 객체 반환
         }
     }
 

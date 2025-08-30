@@ -17,7 +17,6 @@ import java.util.Optional;
 import java.util.concurrent.Executor;
 
 @Service
-@Primary
 public class ChatGptService extends AbstractGenerationService{
     @Value("${chatgpt.api.url}")
     private String apiUrl;
