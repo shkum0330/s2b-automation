@@ -69,7 +69,7 @@ public abstract class AbstractGenerationService implements GenerationService {
     private CertificationResponse fetchCertification(String model) {
         try {
             String prompt = promptBuilder.buildCertificationPrompt(model);
-            log.info(prompt);
+//            log.info(prompt);
             HttpEntity<Map<String, Object>> requestEntity = createRequestEntity(prompt);
             String apiUrl = getApiUrl();
             ResponseEntity<String> response = restTemplate.postForEntity(apiUrl, requestEntity, String.class);
