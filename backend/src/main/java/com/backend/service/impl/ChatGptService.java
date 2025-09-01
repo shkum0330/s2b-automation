@@ -10,6 +10,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.reactive.function.client.WebClient;
 
 import java.util.List;
 import java.util.Map;
@@ -23,8 +24,8 @@ public class ChatGptService extends AbstractGenerationService{
     @Value("${chatgpt.api.key}")
     private String apiKey;
 
-    public ChatGptService(ScrapingService scrapingService, PromptBuilder promptBuilder, ObjectMapper objectMapper, RestTemplate restTemplate, Executor taskExecutor) {
-        super(scrapingService, promptBuilder, objectMapper, restTemplate, taskExecutor);
+    public ChatGptService(ScrapingService scrapingService, PromptBuilder promptBuilder, ObjectMapper objectMapper, WebClient webClient, Executor taskExecutor) {
+        super(scrapingService, promptBuilder, objectMapper, webClient, taskExecutor);
     }
 
     @Override

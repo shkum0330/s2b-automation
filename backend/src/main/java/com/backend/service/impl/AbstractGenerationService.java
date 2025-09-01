@@ -1,25 +1,22 @@
 package com.backend.service.impl;
 
-// CertificationResponse import 제거
 import com.backend.dto.CertificationResponse;
 import com.backend.dto.GenerateResponse;
 import com.backend.exception.GenerateApiException;
 import com.backend.service.GenerationService;
 import com.backend.service.PromptBuilder;
 import com.backend.service.ScrapingService;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpEntity;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.client.HttpServerErrorException;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.web.reactive.function.client.WebClient;
 
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 
 @RequiredArgsConstructor
@@ -28,75 +25,74 @@ public abstract class AbstractGenerationService implements GenerationService {
     private final ScrapingService scrapingService;
     private final PromptBuilder promptBuilder;
     private final ObjectMapper objectMapper;
-    private final RestTemplate restTemplate;
+    private final WebClient webClient;
     private final Executor taskExecutor;
 
     @Override
-    public GenerateResponse generateSpec(String model, String specExample, String productNameExample) throws GenerateApiException {
+    public CompletableFuture<GenerateResponse> generateSpec(String model, String specExample, String productNameExample) {
+
+        // 스크래핑 작업은 별도의 스레드에서 실행
         CompletableFuture<Optional<String>> g2bFuture = CompletableFuture.supplyAsync(
                 () -> scrapingService.findG2bClassificationNumber(model), taskExecutor);
 
-        // certFuture의 반환 타입을 GenerateResponse로 변경
-        CompletableFuture<CertificationResponse> certFuture = CompletableFuture.supplyAsync(
-                () -> fetchCertification(model), taskExecutor);
+        CompletableFuture<CertificationResponse> certFuture = this.fetchCertification(model);
+        CompletableFuture<GenerateResponse> mainSpecFuture = this.fetchMainSpec(model, specExample, productNameExample);
 
-        CompletableFuture<GenerateResponse> mainSpecFuture = CompletableFuture.supplyAsync(
-                () -> fetchMainSpec(model, specExample, productNameExample), taskExecutor);
+        // 세 개의 비동기 작업이 모두 완료되면 그 결과를 조합하여 최종 GenerateResponse 생성
+        return CompletableFuture.allOf(g2bFuture, certFuture, mainSpecFuture)
+                .thenApplyAsync(v -> {
+                    try {
+                        GenerateResponse finalResponse = mainSpecFuture.get();
+                        CertificationResponse certResponse = certFuture.get();
+                        Optional<String> g2bOpt = g2bFuture.get();
 
-        try {
-            CompletableFuture.allOf(g2bFuture, certFuture, mainSpecFuture).join();
+                        finalResponse.setCertificationNumber(certResponse);
+                        g2bOpt.ifPresent(finalResponse::setG2bClassificationNumber);
 
-            GenerateResponse response = mainSpecFuture.get();
-            CertificationResponse cert = certFuture.get();
-            Optional<String> g2bOpt = g2bFuture.get();
-
-            response.setCertificationNumber(cert);
-            g2bOpt.ifPresent(response::setG2bClassificationNumber);
-
-            return response;
-
-        } catch (CompletionException e) {
-            Throwable cause = e.getCause();
-            if (cause instanceof GenerateApiException) {
-                throw (GenerateApiException) cause;
-            }
-            throw new GenerateApiException("사양 생성 중 알 수 없는 오류가 발생했습니다.", e);
-        } catch (Exception e) {
-            throw new GenerateApiException("비동기 작업 결과 조합 중 오류가 발생했습니다.", e);
-        }
+                        return finalResponse;
+                    } catch (InterruptedException | ExecutionException e) {
+                        throw new CompletionException(e);
+                    }
+                }, taskExecutor);
     }
 
-    private CertificationResponse fetchCertification(String model) {
-        try {
-            String prompt = promptBuilder.buildCertificationPrompt(model);
-//            log.info(prompt);
-            HttpEntity<Map<String, Object>> requestEntity = createRequestEntity(prompt);
-            String apiUrl = getApiUrl();
-            ResponseEntity<String> response = restTemplate.postForEntity(apiUrl, requestEntity, String.class);
-            String generatedText = extractTextFromResponse(response.getBody());
-//            log.info("{}의 생성된 인증번호 대답: {}", model, generatedText);
-            // objectMapper가 JSON을 GenerateResponse 객체로 변환하도록 수정
-            return objectMapper.readValue(generatedText, CertificationResponse.class);
-        } catch (Exception e) {
-            log.warn("인증번호 조회 중 오류 발생 (모델: {}): {}", model, e.getMessage());
-            return new CertificationResponse(); // 실패 시 빈 GenerateResponse 객체 반환
-        }
+    private CompletableFuture<CertificationResponse> fetchCertification(String model) {
+        String prompt = promptBuilder.buildCertificationPrompt(model);
+        HttpEntity<Map<String, Object>> requestEntity = createRequestEntity(prompt);
+        String apiUrl = getApiUrl();
+
+        return webClient.post()
+                .uri(apiUrl)
+                .headers(headers -> headers.addAll(requestEntity.getHeaders()))
+                .bodyValue(requestEntity.getBody())
+                .retrieve()
+                .bodyToMono(String.class)
+                .map(jsonResponse -> parseResponse(jsonResponse, CertificationResponse.class))
+                .toFuture();
     }
 
-    private GenerateResponse fetchMainSpec(String model, String specExample, String productNameExample) {
+    private CompletableFuture<GenerateResponse> fetchMainSpec(String model, String specExample, String productNameExample) {
+        String prompt = promptBuilder.buildProductSpecPrompt(model, specExample, productNameExample);
+        HttpEntity<Map<String, Object>> requestEntity = createRequestEntity(prompt);
+        String apiUrl = getApiUrl();
+
+        return webClient.post()
+                .uri(apiUrl)
+                .headers(headers -> headers.addAll(requestEntity.getHeaders()))
+                .bodyValue(requestEntity.getBody())
+                .retrieve()
+                .bodyToMono(String.class)
+                .map(jsonResponse -> parseResponse(jsonResponse, GenerateResponse.class))
+                .toFuture();
+    }
+
+    // 제네릭을 사용하여 공통 파싱 로직 추출
+    private <T> T parseResponse(String jsonResponse, Class<T> clazz) {
         try {
-            String prompt = promptBuilder.buildProductSpecPrompt(model, specExample, productNameExample);
-            HttpEntity<Map<String, Object>> requestEntity = createRequestEntity(prompt);
-            String apiUrl = getApiUrl();
-            ResponseEntity<String> response = restTemplate.postForEntity(apiUrl, requestEntity, String.class);
-            String generatedText = extractTextFromResponse(response.getBody());
-            return objectMapper.readValue(generatedText, GenerateResponse.class);
-        } catch (HttpServerErrorException.ServiceUnavailable e) {
-            throw new CompletionException(new GenerateApiException(getApiName() + " API가 과부하 상태입니다."));
-        } catch (JsonProcessingException e) {
-            throw new CompletionException(new GenerateApiException("AI가 생성한 응답의 형식이 잘못되었습니다."));
+            String generatedText = extractTextFromResponse(jsonResponse);
+            return objectMapper.readValue(generatedText, clazz);
         } catch (Exception e) {
-            throw new CompletionException(new GenerateApiException("AI 응답 처리 중 오류가 발생했습니다.", e));
+            throw new CompletionException(new GenerateApiException("AI 응답 파싱 중 오류", e));
         }
     }
 

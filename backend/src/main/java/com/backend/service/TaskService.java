@@ -1,61 +1,80 @@
 package com.backend.service;
 
 import com.backend.dto.GenerateResponse;
+import com.backend.controller.async.TaskSubmission;
+import com.backend.controller.async.TaskResult;
+import com.github.benmanes.caffeine.cache.Cache;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executor;
 import java.util.function.Supplier;
 
+@Slf4j
 @Service
+@RequiredArgsConstructor
 public class TaskService {
-    // 실행 중인 작업들을 저장할 thread-safe 맵
-    private final Map<String, CompletableFuture<GenerateResponse>> runningTasks = new ConcurrentHashMap<>();
+    // 메모리 누수와 결과 유실 문제를 해결하기 위해 캐시 사용
+    private final Cache<String, CompletableFuture<GenerateResponse>> taskCache;
+    private final Executor taskExecutor; // 생성자에 Executor 추가
 
-    // 작업을 등록하고 즉시 Task ID를 반환하는 메서드
-    public String submitTask(Supplier<CompletableFuture<GenerateResponse>> taskSupplier) {
+    // Supplier 대신 CompletableFuture를 직접 받도록 수정
+    public String submitTask(CompletableFuture<GenerateResponse> future) {
         String taskId = UUID.randomUUID().toString();
-        CompletableFuture<GenerateResponse> future = taskSupplier.get()
-                .whenComplete((result, error) -> {
-                    // 작업 완료 또는 실패 시 맵에서 제거 (메모리 누수 방지)
-                    if (error != null) {
-                        // todo: 커스텀 예외 지정
-                    }
-                    runningTasks.remove(taskId);
-                });
-        runningTasks.put(taskId, future);
+
+        // 전달받은 future에 콜백을 연결
+        future.whenCompleteAsync((result, error) -> {
+            if (error != null) {
+                log.error("Task {} failed.", taskId, error.getCause());
+            } else {
+                log.info("Task {} completed successfully.", taskId);
+            }
+        }, taskExecutor);
+
+        taskCache.put(taskId, future);
         return taskId;
     }
 
-    // Task ID로 작업 상태와 결과를 조회하는 메서드
-    public Map<String, Object> getTaskResult(String taskId) {
-        CompletableFuture<GenerateResponse> future = runningTasks.get(taskId);
+
+    public TaskResult<GenerateResponse> getTaskResult(String taskId) {
+        CompletableFuture<GenerateResponse> future = taskCache.getIfPresent(taskId);
 
         if (future == null) {
-            return Map.of("status", "NOT_FOUND");
+            // 캐시에 작업이 없으면, 만료되었거나 존재하지 않는 ID
+            return TaskResult.notFound();
         }
-        if (future.isDone() && !future.isCancelled()) {
+
+        if (future.isDone()) {
+            if (future.isCancelled()) {
+                return TaskResult.cancelled();
+            }
+            // isDone()이 true이고 취소되지 않았다면, 성공 또는 실패 상태
             try {
-                return Map.of("status", "COMPLETED", "result", future.get());
+                // .get()은 성공 시 결과를 반환하고, 실패 시 예외를 던짐
+                GenerateResponse result = future.get();
+                return TaskResult.completed(result);
             } catch (Exception e) {
-                return Map.of("status", "FAILED", "error", e.getMessage());
+                Throwable cause = e.getCause();
+                String errorMessage = (cause != null) ? cause.getMessage() : e.getMessage();
+                return TaskResult.failed(errorMessage);
             }
         }
-        if (future.isCancelled()) {
-            return Map.of("status", "CANCELLED");
-        }
-
-        return Map.of("status", "RUNNING");
+        // 작업이 아직 완료되지 않았다면 RUNNING 상태
+        return TaskResult.running();
     }
 
-    // Task ID로 작업을 취소하는 메서드
     public boolean cancelTask(String taskId) {
-        CompletableFuture<GenerateResponse> future = runningTasks.get(taskId);
+        CompletableFuture<GenerateResponse> future = taskCache.getIfPresent(taskId);
         if (future != null && !future.isDone()) {
-            // true는 인터럽트를 시도하여 작업을 강제 종료
-            return future.cancel(true);
+            // true 파라미터는 실행 중인 스레드를 인터럽트 하려고 시도
+            boolean cancelled = future.cancel(true);
+            if (cancelled) {
+                log.info("Task {} 성공적으로 취소됨", taskId);
+            }
+            return cancelled;
         }
         return false;
     }

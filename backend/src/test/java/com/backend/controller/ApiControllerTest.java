@@ -23,6 +23,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
+import java.util.concurrent.CompletableFuture; // CompletableFuture import
+
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.document;
@@ -49,7 +51,6 @@ class ApiControllerTest {
     static class TestConfig {
         @Bean
         public GenerationService generationService() {
-            // Mockito를 사용해 GenerationService의 Mock 객체를 생성하고 Bean으로 등록
             return Mockito.mock(GenerationService.class);
         }
     }
@@ -70,9 +71,8 @@ class ApiControllerTest {
         request.setSpecExample("32평형(106㎡) / UV살균 / 에너지효율 2등급 / 380×876×406mm");
         request.setProductNameExample("삼성전자 비스포크 큐브 Air 공기청정기");
 
-        // --- 응답 객체 전체 설정 ---
         GenerateResponse response = new GenerateResponse();
-        CertificationResponse certResponse = new CertificationResponse(); // 중첩 객체 생성
+        CertificationResponse certResponse = new CertificationResponse();
         certResponse.setKatsCertificationNumber("YU07266-22001");
         certResponse.setKcCertificationNumber("R-R-SEC-AIR2206");
 
@@ -82,32 +82,34 @@ class ApiControllerTest {
         response.setManufacturer("삼성전자(주)");
         response.setCountryOfOrigin("태국");
         response.setG2bClassificationNumber("24574852");
-        response.setCertificationNumber(certResponse); // 인증정보 설정
-        // --- 설정 완료 ---
+        response.setCertificationNumber(certResponse);
 
-        // Mock Bean의 동작을 정의.
-        when(generationService.generateSpec(any(), any(), any())).thenReturn(response);
+        // 서비스가 CompletableFuture를 반환하도록 Mocking
+        when(generationService.generateSpec(any(), any(), any()))
+                .thenReturn(CompletableFuture.completedFuture(response));
 
         // when & then & andDo(document)
         mockMvc.perform(RestDocumentationRequestBuilders.post("/api/generate-spec")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
-                .andDo(document("generate-spec", // 문서 조각이 저장될 폴더명
+                .andDo(document("generate-spec",
                         preprocessRequest(prettyPrint()),
                         preprocessResponse(prettyPrint()),
-                        requestFields( // 요청 필드 문서화
+                        requestFields(
                                 fieldWithPath("model").description("조사할 제품의 모델명"),
                                 fieldWithPath("specExample").description("참고할 규격의 형식 예시"),
                                 fieldWithPath("productNameExample").description("참고할 물품명의 형식 예시 (선택 사항)")
                         ),
-                        responseFields( // 응답 필드 문서화 (중첩 구조 포함)
+                        // (수정) 중첩된 certification 객체 구조에 맞게 문서 경로 수정
+                        responseFields(
                                 fieldWithPath("productName").description("AI가 생성한 물품명"),
                                 fieldWithPath("specification").description("AI가 생성한 규격"),
                                 fieldWithPath("modelName").description("조사 대상 모델명 (입력값과 동일)"),
                                 fieldWithPath("manufacturer").description("제조사"),
                                 fieldWithPath("countryOfOrigin").description("원산지"),
                                 fieldWithPath("g2bClassificationNumber").description("G2B 물품목록번호"),
+                                fieldWithPath("certification").description("인증 정보 객체"),
                                 fieldWithPath("katsCertificationNumber").description("국가기술표준원 전기안전인증번호"),
                                 fieldWithPath("kcCertificationNumber").description("KC 전파적합성인증번호")
                         )
