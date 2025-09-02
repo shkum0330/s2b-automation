@@ -48,20 +48,36 @@ class S2BApp(QWidget):
         self.initUI()
 
     def initUI(self):
-        # --- UI 구성 코드는 변경 없습니다 ---
+        # --- 1. 요청(Request) UI 그룹 ---
         request_group = QGroupBox("1. 서버에 보낼 정보 (GenerateRequest)")
-        model_label = QLabel("model:")
-        self.model_input = QLineEdit()
-        self.model_input.setPlaceholderText("API 요청에 사용할 모델명을 입력하세요")
 
-        product_name_example_label = QLabel("productNameExample:")
+        # --- 여기부터 수정 ---
+
+        # 1. 위젯 정의 (순서는 상관 없음)
+        product_name_example_label = QLabel("1. 물품(용역)명:")
         self.product_name_example_input = QLineEdit()
         self.product_name_example_input.setPlaceholderText("물품명 예시를 입력하세요 (선택 사항)")
 
-        spec_example_label = QLabel("specExample:")
+        spec_example_label = QLabel("2. 규격 예시:")
         self.spec_example_input = QTextEdit()
-        self.spec_example_input.setPlaceholderText("API 요청에 사용할 규격 예시를 입력하세요")
+        self.spec_example_input.setPlaceholderText("규격(사양, 용량, 색상 등) 예시를 입력하세요")
         self.spec_example_input.setFixedHeight(80)
+
+        model_label = QLabel("3. 모델명:")
+        self.model_input = QLineEdit()
+        self.model_input.setPlaceholderText("API 요청에 사용할 모델명을 입력하세요")
+
+        # 2. 레이아웃에 추가하는 순서 변경
+        req_layout = QGridLayout()
+        req_layout.addWidget(product_name_example_label, 0, 0)
+        req_layout.addWidget(self.product_name_example_input, 0, 1)
+        req_layout.addWidget(spec_example_label, 1, 0, Qt.AlignTop)
+        req_layout.addWidget(self.spec_example_input, 1, 1)
+        req_layout.addWidget(model_label, 2, 0)
+        req_layout.addWidget(self.model_input, 2, 1)
+        request_group.setLayout(req_layout)
+
+        # --- 여기까지 수정 ---
 
         action_group = QGroupBox("2. 실행")
         self.run_button = QPushButton("🚀 AI로 결과 생성하기")
@@ -121,15 +137,6 @@ class S2BApp(QWidget):
         res_layout.addWidget(cert_group, len(fields_info), 0, 1, 3)
         response_group.setLayout(res_layout)
 
-        req_layout = QGridLayout()
-        req_layout.addWidget(model_label, 0, 0)
-        req_layout.addWidget(self.model_input, 0, 1)
-        req_layout.addWidget(product_name_example_label, 1, 0)
-        req_layout.addWidget(self.product_name_example_input, 1, 1)
-        req_layout.addWidget(spec_example_label, 2, 0, Qt.AlignTop)
-        req_layout.addWidget(self.spec_example_input, 2, 1)
-        request_group.setLayout(req_layout)
-
         main_layout = QVBoxLayout(self)
         main_layout.addWidget(request_group)
         main_layout.addWidget(action_group)
@@ -148,7 +155,7 @@ class S2BApp(QWidget):
         product_name_example = self.product_name_example_input.text()
 
         if not model or not spec_example:
-            QMessageBox.warning(self, "입력 오류", "model과 specExample은 반드시 입력해야 합니다.")
+            QMessageBox.warning(self, "입력 오류", "모델명과 규격 예시는 반드시 입력해야 합니다.")
             return
 
         self.run_button.setEnabled(False)
@@ -200,26 +207,22 @@ class S2BApp(QWidget):
         else:
             self.status_label.setText(f"상태: ⏳ 작업 진행 중... (ID: ...{self.current_task_id[-6:]}).")
 
-    # --- cancel_api_call과 handle_cancel_response 수정 ---
     def cancel_api_call(self):
         if not self.current_task_id:
-            # 아직 taskId를 받기 전에 취소 버튼을 누른 경우
             self.handle_error("작업 시작 전에 취소되었습니다.")
             return
 
-        self.polling_timer.stop()  # 가장 먼저 폴링 중단
+        self.polling_timer.stop()
         self.status_label.setText("상태: ❌ 작업 취소 요청 중...")
         self.status_label.setStyleSheet("color: orange;")
-        self.cancel_button.setEnabled(False)  # 중복 클릭 방지
+        self.cancel_button.setEnabled(False)
 
         url = f"http://localhost:8080/api/cancel/{self.current_task_id}"
         self.worker = ApiWorker('POST', url, timeout=10)
-        # 취소 요청의 응답은 새로운 핸들러에서 처리
         self.worker.finished.connect(self.handle_cancel_response)
         self.worker.start()
 
     def handle_cancel_response(self, result):
-        """취소 요청에 대한 서버 응답을 처리하고 UI 상태를 최종 정리합니다."""
         if result.get("success"):
             self.status_label.setText("상태: ❌ 작업이 사용자에 의해 성공적으로 취소되었습니다.")
             self.status_label.setStyleSheet("color: red;")
@@ -231,8 +234,6 @@ class S2BApp(QWidget):
         self.current_task_id = None
         self.run_button.setEnabled(True)
         self.cancel_button.setEnabled(False)
-
-    # --- 수정 완료 ---
 
     def handle_api_result(self, result):
         self.status_label.setText("상태: ✅ AI 생성 완료!")
