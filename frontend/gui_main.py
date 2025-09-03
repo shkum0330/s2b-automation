@@ -6,7 +6,6 @@ from PyQt5.QtWidgets import (QApplication, QWidget, QLabel, QLineEdit,
                              QGridLayout, QMessageBox, QHBoxLayout)
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QTimer
 
-
 # 범용 ApiWorker는 짧은 요청들을 처리
 class ApiWorker(QThread):
     finished = pyqtSignal(object)
@@ -49,11 +48,8 @@ class S2BApp(QWidget):
 
     def initUI(self):
         # --- 1. 요청(Request) UI 그룹 ---
-        request_group = QGroupBox("1. 서버에 보낼 정보 (GenerateRequest)")
+        request_group = QGroupBox("서버에 보낼 정보")
 
-        # --- 여기부터 수정 ---
-
-        # 1. 위젯 정의 (순서는 상관 없음)
         product_name_example_label = QLabel("1. 물품(용역)명:")
         self.product_name_example_input = QLineEdit()
         self.product_name_example_input.setPlaceholderText("물품명 예시를 입력하세요 (선택 사항)")
@@ -67,7 +63,6 @@ class S2BApp(QWidget):
         self.model_input = QLineEdit()
         self.model_input.setPlaceholderText("API 요청에 사용할 모델명을 입력하세요")
 
-        # 2. 레이아웃에 추가하는 순서 변경
         req_layout = QGridLayout()
         req_layout.addWidget(product_name_example_label, 0, 0)
         req_layout.addWidget(self.product_name_example_input, 0, 1)
@@ -77,8 +72,7 @@ class S2BApp(QWidget):
         req_layout.addWidget(self.model_input, 2, 1)
         request_group.setLayout(req_layout)
 
-        # --- 여기까지 수정 ---
-
+        # --- 2. 실행 UI 그룹 ---
         action_group = QGroupBox("2. 실행")
         self.run_button = QPushButton("🚀 AI로 결과 생성하기")
         self.cancel_button = QPushButton("❌ 취소")
@@ -96,45 +90,43 @@ class S2BApp(QWidget):
         action_layout.addWidget(self.status_label)
         action_group.setLayout(action_layout)
 
-        response_group = QGroupBox("3. 서버로부터 받은 결과 (GenerateResponse)")
-        fields_info = [
-            ("productName", QLineEdit), ("specification", QTextEdit),
-            ("modelName", QLineEdit), ("manufacturer", QLineEdit),
-            ("countryOfOrigin", QLineEdit), ("g2bClassificationNumber", QLineEdit)
+        # --- 3. 결과(Response) UI 그룹 ---
+        response_group = QGroupBox("서버로부터 받은 결과")
+
+        # 요청하신 순서와 한글 라벨로 필드 정보를 재정의
+        # (내부 변수명, "화면에 표시될 한글 라벨", 위젯 종류)
+        ordered_fields_info = [
+            ("productName", "1. 물품(용역)명:", QLineEdit),
+            ("specification", "2. 규격(사양, 용량, 색상, 판매개수 등):", QTextEdit),
+            ("modelName", "3. 모델명:", QLineEdit),
+            ("manufacturer", "4. 제조사:", QLineEdit),
+            ("katsCertificationNumber", "5. 전기용품 인증정보:", QLineEdit),
+            ("kcCertificationNumber", "6. 방송통신기자재 인증정보:", QLineEdit),
+            ("g2bClassificationNumber", "7. G2B 물품목록번호:", QLineEdit)
         ]
-        cert_fields_info = [
-            ("katsCertificationNumber", QLineEdit), ("kcCertificationNumber", QLineEdit)
-        ]
+
         res_layout = QGridLayout()
-        for i, (field_name, widget_type) in enumerate(fields_info):
-            label = QLabel(f"{field_name}:")
+        # 재정의된 순서대로 위젯을 생성하고 레이아웃에 추가
+        for i, (field_name, korean_label, widget_type) in enumerate(ordered_fields_info):
+            label = QLabel(korean_label)
             output_widget = widget_type()
             output_widget.setReadOnly(True)
             if widget_type == QTextEdit:
                 output_widget.setFixedHeight(80)
+
             copy_button = QPushButton("복사")
             copy_button.clicked.connect(lambda _, text_widget=output_widget: self.copy_to_clipboard(text_widget))
             copy_button.setFixedWidth(50)
+
             self.output_fields[field_name] = output_widget
             self.copy_buttons[field_name] = copy_button
-            res_layout.addWidget(label, i, 0, Qt.AlignTop if widget_type == QTextEdit else Qt.AlignLeft)
+
+            # QTextEdit 위젯의 라벨은 상단에 정렬
+            align = Qt.AlignTop if widget_type == QTextEdit else Qt.AlignLeft
+            res_layout.addWidget(label, i, 0, align)
             res_layout.addWidget(output_widget, i, 1)
             res_layout.addWidget(copy_button, i, 2)
-        cert_group = QGroupBox("Certification")
-        cert_layout = QGridLayout(cert_group)
-        for i, (field_name, widget_type) in enumerate(cert_fields_info):
-            label = QLabel(f"{field_name}:")
-            output_widget = widget_type()
-            output_widget.setReadOnly(True)
-            copy_button = QPushButton("복사")
-            copy_button.clicked.connect(lambda _, text_widget=output_widget: self.copy_to_clipboard(text_widget))
-            copy_button.setFixedWidth(50)
-            self.output_fields[field_name] = output_widget
-            self.copy_buttons[field_name] = copy_button
-            cert_layout.addWidget(label, i, 0)
-            cert_layout.addWidget(output_widget, i, 1)
-            cert_layout.addWidget(copy_button, i, 2)
-        res_layout.addWidget(cert_group, len(fields_info), 0, 1, 3)
+
         response_group.setLayout(res_layout)
 
         main_layout = QVBoxLayout(self)
@@ -240,6 +232,7 @@ class S2BApp(QWidget):
         self.status_label.setStyleSheet("color: green;")
 
         for field_name, output_widget in self.output_fields.items():
+            # 인증 정보는 'certification' 객체 내부에 있을 수 있으므로 분기 처리
             if field_name in ["katsCertificationNumber", "kcCertificationNumber"]:
                 cert_data = result.get("certification", {})
                 text_value = str(cert_data.get(field_name, '') if cert_data else '')

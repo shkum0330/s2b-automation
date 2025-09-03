@@ -28,7 +28,7 @@ public class ScrapingService {
     );
 
     private final Random random = new Random();
-
+    
     public Optional<String> findG2bClassificationNumber(String modelName) {
         try {
             TimeUnit.MILLISECONDS.sleep(1000 + random.nextInt(2000));
