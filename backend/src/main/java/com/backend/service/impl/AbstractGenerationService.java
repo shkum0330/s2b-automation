@@ -6,6 +6,7 @@ import com.backend.exception.GenerateApiException;
 import com.backend.service.GenerationService;
 import com.backend.service.PromptBuilder;
 import com.backend.service.ScrapingService;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -61,6 +62,8 @@ public abstract class AbstractGenerationService implements GenerationService {
         HttpEntity<Map<String, Object>> requestEntity = createRequestEntity(prompt);
         String apiUrl = getApiUrl();
 
+        logRequestAsJson(apiUrl, requestEntity.getBody());
+
         return webClient.post()
                 .uri(apiUrl)
                 .headers(headers -> headers.addAll(requestEntity.getHeaders()))
@@ -76,6 +79,8 @@ public abstract class AbstractGenerationService implements GenerationService {
         HttpEntity<Map<String, Object>> requestEntity = createRequestEntity(prompt);
         String apiUrl = getApiUrl();
 
+        logRequestAsJson(apiUrl, requestEntity.getBody());
+
         return webClient.post()
                 .uri(apiUrl)
                 .headers(headers -> headers.addAll(requestEntity.getHeaders()))
@@ -84,6 +89,16 @@ public abstract class AbstractGenerationService implements GenerationService {
                 .bodyToMono(String.class)
                 .map(jsonResponse -> parseResponse(jsonResponse, GenerateResponse.class))
                 .toFuture();
+    }
+
+    // 로깅을 위한 헬퍼(helper) 메서드 추가
+    private void logRequestAsJson(String url, Object body) {
+        try {
+            String jsonBody = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(body);
+            log.info("\n--- Sending API Request ---\nURL: {}\nBody:\n{}", url, jsonBody);
+        } catch (JsonProcessingException e) {
+            log.warn("request body 직렬화 실패", e);
+        }
     }
 
     // 제네릭을 사용하여 공통 파싱 로직 추출

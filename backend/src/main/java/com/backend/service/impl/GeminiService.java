@@ -9,7 +9,6 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.util.List;
@@ -36,26 +35,24 @@ public class GeminiService extends AbstractGenerationService {
 
     @Override
     protected HttpEntity<Map<String, Object>> createRequestEntity(String prompt) {
-        // 1. generationConfig 맵 수정
         Map<String, Object> generationConfig = Map.of(
                 "temperature", 0.3,
-                // "topP", 0.95,
-                "maxOutputTokens", 65536,
+                "maxOutputTokens", 8192,
                 "response_mime_type", "application/json"
         );
 
-//        // 2. tools 파라미터 추가 (Grounding with Google Search 활성화)
-//        Map<String, Object> googleSearchTool = Map.of(
-//                "google_search_retrieval", Map.of()
-//        );
+
+        // 'google_search' 도구 정의
+        Map<String, Object> googleSearchTool = Map.of(
+                "google_search", Map.of() // 빈 객체 {} 를 의미
+        );
 
         Map<String, Object> requestBody = Map.of(
                 "contents", List.of(Map.of(
-                        "role", "user",
                         "parts", List.of(Map.of("text", prompt))
                 )),
-                "generationConfig", generationConfig
-//                "tools", List.of(googleSearchTool) // (추가)
+                "generationConfig", generationConfig,
+                "tools", List.of(googleSearchTool)
         );
 
 
@@ -63,7 +60,6 @@ public class GeminiService extends AbstractGenerationService {
         headers.setContentType(MediaType.APPLICATION_JSON);
         return new HttpEntity<>(requestBody, headers);
     }
-
 
     @Override
     protected String extractTextFromResponse(String jsonResponse) throws Exception {
