@@ -19,9 +19,8 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
+import java.util.concurrent.CompletionException;
 
 @RequiredArgsConstructor
 @Slf4j
@@ -42,21 +41,17 @@ public abstract class AbstractGenerationService implements GenerationService {
         CompletableFuture<CertificationResponse> certFuture = this.fetchCertification(model);
         CompletableFuture<GenerateResponse> mainSpecFuture = this.fetchMainSpec(model, specExample, productNameExample);
 
-        // 세 개의 비동기 작업이 모두 완료되면 그 결과를 조합하여 최종 GenerateResponse 생성
-        return CompletableFuture.allOf(g2bFuture, certFuture, mainSpecFuture)
-                .thenApplyAsync(v -> {
-                    try {
-                        GenerateResponse finalResponse = mainSpecFuture.get();
-                        CertificationResponse certResponse = certFuture.get();
-                        Optional<String> g2bOpt = g2bFuture.get();
-
-                        finalResponse.setCertificationNumber(certResponse);
-                        g2bOpt.ifPresent(finalResponse::setG2bClassificationNumber);
-
-                        return finalResponse;
-                    } catch (InterruptedException | ExecutionException e) {
-                        throw new CompletionException(e);
-                    }
+        // thenCombineAsync를 사용하여 논블로킹 방식으로 비동기 결과들을 조합합니다.
+        // 1. 메인 사양과 인증 정보를 조합합니다.
+        return mainSpecFuture
+                .thenCombineAsync(certFuture, (mainSpec, cert) -> {
+                    mainSpec.setCertificationNumber(cert);
+                    return mainSpec;
+                }, taskExecutor)
+                // 2. 위 결과에 G2B 번호를 조합합니다.
+                .thenCombineAsync(g2bFuture, (mainSpec, g2bOpt) -> {
+                    g2bOpt.ifPresent(mainSpec::setG2bClassificationNumber);
+                    return mainSpec;
                 }, taskExecutor);
     }
 
@@ -68,7 +63,7 @@ public abstract class AbstractGenerationService implements GenerationService {
             maxAttempts = 3,
             backoff = @Backoff(delay = 2000)
     )
-    private CompletableFuture<CertificationResponse> fetchCertification(String model) {
+    protected CompletableFuture<CertificationResponse> fetchCertification(String model) {
         String prompt = promptBuilder.buildCertificationPrompt(model);
         HttpEntity<Map<String, Object>> requestEntity = createRequestEntity(prompt);
         String apiUrl = getApiUrl();
@@ -93,7 +88,7 @@ public abstract class AbstractGenerationService implements GenerationService {
             maxAttempts = 3,
             backoff = @Backoff(delay = 2000)
     )
-    private CompletableFuture<GenerateResponse> fetchMainSpec(String model, String specExample, String productNameExample) {
+    protected CompletableFuture<GenerateResponse> fetchMainSpec(String model, String specExample, String productNameExample) {
         String prompt = promptBuilder.buildProductSpecPrompt(model, specExample, productNameExample);
         HttpEntity<Map<String, Object>> requestEntity = createRequestEntity(prompt);
         String apiUrl = getApiUrl();
