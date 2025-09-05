@@ -36,9 +36,8 @@ public class GeminiService extends AbstractGenerationService {
     @Override
     protected HttpEntity<Map<String, Object>> createRequestEntity(String prompt) {
         Map<String, Object> generationConfig = Map.of(
-                "temperature", 0.3,
-                "maxOutputTokens", 8192,
-                "response_mime_type", "application/json"
+                "temperature", 0.5,
+                "maxOutputTokens", 8192
         );
 
 

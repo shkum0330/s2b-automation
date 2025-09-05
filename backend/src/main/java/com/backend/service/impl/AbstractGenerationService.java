@@ -11,7 +11,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpEntity;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Retryable;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 import java.util.Map;
 import java.util.Optional;
@@ -57,12 +60,20 @@ public abstract class AbstractGenerationService implements GenerationService {
                 }, taskExecutor);
     }
 
+    @Retryable(
+            retryFor = {
+                    WebClientResponseException.InternalServerError.class,
+                    WebClientResponseException.ServiceUnavailable.class
+            },
+            maxAttempts = 3,
+            backoff = @Backoff(delay = 2000)
+    )
     private CompletableFuture<CertificationResponse> fetchCertification(String model) {
         String prompt = promptBuilder.buildCertificationPrompt(model);
         HttpEntity<Map<String, Object>> requestEntity = createRequestEntity(prompt);
         String apiUrl = getApiUrl();
 
-        logRequestAsJson(apiUrl, requestEntity.getBody());
+//        logRequestAsJson(apiUrl, requestEntity.getBody());
 
         return webClient.post()
                 .uri(apiUrl)
@@ -74,12 +85,20 @@ public abstract class AbstractGenerationService implements GenerationService {
                 .toFuture();
     }
 
+    @Retryable(
+            retryFor = {
+                    WebClientResponseException.InternalServerError.class,
+                    WebClientResponseException.ServiceUnavailable.class
+            },
+            maxAttempts = 3,
+            backoff = @Backoff(delay = 2000)
+    )
     private CompletableFuture<GenerateResponse> fetchMainSpec(String model, String specExample, String productNameExample) {
         String prompt = promptBuilder.buildProductSpecPrompt(model, specExample, productNameExample);
         HttpEntity<Map<String, Object>> requestEntity = createRequestEntity(prompt);
         String apiUrl = getApiUrl();
 
-        logRequestAsJson(apiUrl, requestEntity.getBody());
+//        logRequestAsJson(apiUrl, requestEntity.getBody());
 
         return webClient.post()
                 .uri(apiUrl)
