@@ -1,21 +1,6 @@
 package com.backend.service.impl;
 
-import com.backend.exception.GenerateApiException;
-import com.backend.service.PromptBuilder;
-import com.backend.service.ScrapingService;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Primary;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
-
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.concurrent.Executor;
 
 @Service
 public class ChatGptService {

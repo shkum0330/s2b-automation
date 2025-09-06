@@ -4,7 +4,7 @@ import com.backend.dto.CertificationResponse;
 import com.backend.dto.GenerateResponse;
 import com.backend.exception.GenerateApiException;
 import com.backend.service.GenerationService;
-import com.backend.service.PromptBuilder;
+import com.backend.service.util.PromptBuilder;
 import com.backend.service.ScrapingService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;

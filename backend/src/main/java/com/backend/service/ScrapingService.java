@@ -1,5 +1,6 @@
 package com.backend.service;
 
+import com.backend.service.util.CountryCode;
 import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -13,6 +14,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Service
 @Slf4j
@@ -22,66 +25,93 @@ public class ScrapingService {
 
     private static final List<String> USER_AGENTS = Arrays.asList(
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:126.0) Gecko/20100101 Firefox/126.0",
-            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
     );
 
     private final Random random = new Random();
 
+    // G2B 물품목록번호를 찾는 기존 메서드 (Optional<String> 반환하도록 수정)
     public Optional<String> findG2bClassificationNumber(String modelName) {
         try {
-            TimeUnit.MILLISECONDS.sleep(1000 + random.nextInt(2000));
-
-            String encodedModelName = URLEncoder.encode(modelName, StandardCharsets.UTF_8);
-            String searchUrl = NARA_SEARCH_URL + encodedModelName;
-            log.info("Searching G2B Number at: {}", searchUrl);
-
-            String randomUserAgent = USER_AGENTS.get(random.nextInt(USER_AGENTS.size()));
-
-            Document doc = Jsoup.connect(searchUrl)
-                    .header("User-Agent", randomUserAgent)
-                    .header("Referer", NARA_REFERER_URL)
-                    .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7")
-                    .header("Accept-Language", "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7")
-                    .timeout(10000)
-                    .get();
-
+            Document doc = getScrapingDocument(modelName);
             Element firstResultItem = doc.selectFirst("ul.bb_d7dbe4 > li:first-child");
 
             if (firstResultItem == null) {
-                log.info("검색 결과가 없습니다. (모델명: {})", modelName);
+                log.info("G2B 번호 검색 결과가 없습니다. (모델명: {})", modelName);
                 return Optional.empty();
             }
 
-            // 2. 해당 블록 내에 하이라이트 태그(<span class="searchKeyword">)로 올바른 물품인지 확인
             Element highlightElement = firstResultItem.selectFirst("span.searchKeyword");
 
             if (highlightElement != null) {
                 Element numberElement = firstResultItem.selectFirst(".searchLabel_blue .labelNum");
                 if (numberElement != null) {
-                    String fullNumberText = numberElement.text().trim(); // "40161602-24574852"
+                    String fullNumberText = numberElement.text().trim();
                     String[] numberParts = fullNumberText.split("-");
-
-                    // 하이픈이 포함된 정상적인 형식인지 확인
                     if (numberParts.length == 2) {
-                        String lastEightDigits = numberParts[1]; // "24574852"
-                        log.info("스크래핑 성공: 전체 번호 '{}'에서 마지막 8자리 '{}'를 추출했습니다.", fullNumberText, lastEightDigits);
-                        return Optional.of(lastEightDigits);
+                        log.info("G2B 번호 스크래핑 성공: '{}'", numberParts[1]);
+                        return Optional.of(numberParts[1]);
                     }
                 }
             }
-
-            log.info("첫번째 검색 결과에 하이라이트된 검색어가 없어 값을 가져오지 않습니다. (모델명: {})", modelName);
+            log.info("G2B 번호 스크래핑 결과: 하이라이트된 검색어가 없습니다. (모델명: {})", modelName);
             return Optional.empty();
 
-        } catch (InterruptedException e) {
-            log.warn("스크래핑 지연 중 스레드 인터럽트 발생", e);
-            Thread.currentThread().interrupt();
-            return Optional.empty();
         } catch (Exception e) {
-            log.error("G2B 스크래핑 중 오류가 발생했습니다. (모델명: {})", modelName, e);
+            log.error("G2B 번호 스크래핑 중 오류 발생 (모델명: {})", modelName, e);
             return Optional.empty();
         }
+    }
+
+    // 원산지(국가 코드)를 스크래핑
+    public Optional<String> findCountryOfOrigin(String modelName) {
+        try {
+            Document doc = getScrapingDocument(modelName);
+            // 링크(a) 태그가 아닌, 전체 텍스트를 포함하는 상위 div 태그를 선택
+            Element titleDiv = doc.selectFirst("div.searchListImgTit");
+
+            if (titleDiv == null) {
+                log.info("원산지 검색 결과가 없습니다. (모델명: {})", modelName);
+                return Optional.empty();
+            }
+
+            String fullText = titleDiv.text(); // 예: "공기청정기, 삼성전자, (TH)AX033B310GBD, 33.1㎡, 26W"
+
+            // 정규표현식을 사용하여 (XX) 형식의 국가 코드를 찾음
+            Pattern pattern = Pattern.compile("\\(([A-Z]{2})\\)");
+            Matcher matcher = pattern.matcher(fullText);
+
+            if (matcher.find()) {
+                String countryCode = matcher.group(1); // "TH"
+                log.info("원산지 스크래핑 성공: 국가코드 '{}'를 찾았습니다.", countryCode);
+
+                // 찾은 국가 코드를 CountryCode Enum을 사용해 국가명으로 변환
+                return CountryCode.fromCode(countryCode).map(CountryCode::getCountryName);
+
+            } else {
+                log.info("원산지 스크래핑 결과: 텍스트에서 국가코드를 찾을 수 없습니다. (전체 텍스트: {})", fullText);
+                return Optional.empty();
+            }
+
+        } catch (Exception e) {
+            log.error("원산지 스크래핑 중 오류 발생 (모델명: {})", modelName, e);
+            return Optional.empty();
+        }
+    }
+
+    // 중복되는 Jsoup 접속 로직을 별도 메서드로 분리
+    private Document getScrapingDocument(String modelName) throws Exception {
+        TimeUnit.MILLISECONDS.sleep(1000 + random.nextInt(2000));
+        String encodedModelName = URLEncoder.encode(modelName, StandardCharsets.UTF_8);
+        String searchUrl = NARA_SEARCH_URL + encodedModelName;
+        log.info("Scraping at: {}", searchUrl);
+
+        String randomUserAgent = USER_AGENTS.get(random.nextInt(USER_AGENTS.size()));
+
+        return Jsoup.connect(searchUrl)
+                .header("User-Agent", randomUserAgent)
+                .header("Referer", NARA_REFERER_URL)
+                .timeout(10000)
+                .get();
     }
 }
