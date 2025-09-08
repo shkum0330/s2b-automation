@@ -1,8 +1,7 @@
 package com.backend.service;
 
 import com.backend.dto.GenerateResponse;
-import com.backend.controller.async.TaskSubmission;
-import com.backend.controller.async.TaskResult;
+import com.backend.dto.async.TaskResult;
 import com.github.benmanes.caffeine.cache.Cache;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -11,7 +10,6 @@ import org.springframework.stereotype.Service;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
-import java.util.function.Supplier;
 
 @Slf4j
 @Service

@@ -1,9 +1,8 @@
 package com.backend.controller;
 
 import com.backend.dto.GenerateRequest;
-import com.backend.controller.async.TaskSubmission;
 import com.backend.dto.GenerateResponse;
-import com.backend.controller.async.TaskResult;
+import com.backend.dto.async.TaskResult;
 import com.backend.service.GenerationService;
 import com.backend.service.TaskService;
 import lombok.RequiredArgsConstructor;
