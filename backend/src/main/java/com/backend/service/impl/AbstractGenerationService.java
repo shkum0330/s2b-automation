@@ -37,20 +37,24 @@ public abstract class AbstractGenerationService implements GenerationService {
         // 스크래핑 작업은 별도의 스레드에서 실행
         CompletableFuture<Optional<String>> g2bFuture = CompletableFuture.supplyAsync(
                 () -> scrapingService.findG2bClassificationNumber(model), taskExecutor);
+        CompletableFuture<Optional<String>> countryOfOriginFuture = CompletableFuture.supplyAsync(
+                () -> scrapingService.findCountryOfOrigin(model), taskExecutor);
 
         CompletableFuture<CertificationResponse> certFuture = this.fetchCertification(model);
         CompletableFuture<GenerateResponse> mainSpecFuture = this.fetchMainSpec(model, specExample, productNameExample);
 
-        // thenCombineAsync를 사용하여 논블로킹 방식으로 비동기 결과들을 조합합니다.
-        // 1. 메인 사양과 인증 정보를 조합합니다.
+        // thenCombineAsync를 사용하여 논블로킹 방식으로 비동기 결과들을 조합
         return mainSpecFuture
                 .thenCombineAsync(certFuture, (mainSpec, cert) -> {
                     mainSpec.setCertificationNumber(cert);
                     return mainSpec;
                 }, taskExecutor)
-                // 2. 위 결과에 G2B 번호를 조합합니다.
                 .thenCombineAsync(g2bFuture, (mainSpec, g2bOpt) -> {
                     g2bOpt.ifPresent(mainSpec::setG2bClassificationNumber);
+                    return mainSpec;
+                }, taskExecutor)
+                .thenCombineAsync(countryOfOriginFuture, (mainSpec, countryOpt) -> {
+                    countryOpt.ifPresent(mainSpec::setCountryOfOrigin); // Scraping 결과가 있으면 Gemini에서 받아온 결과를 덮어씀
                     return mainSpec;
                 }, taskExecutor);
     }
@@ -105,7 +109,7 @@ public abstract class AbstractGenerationService implements GenerationService {
                 .toFuture();
     }
 
-    // 로깅을 위한 헬퍼(helper) 메서드 추가
+    // 로깅을 위한 메서드
     private void logRequestAsJson(String url, Object body) {
         try {
             String jsonBody = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(body);
