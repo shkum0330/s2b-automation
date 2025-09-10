@@ -1,5 +1,6 @@
 package com.backend.service;
 
+import com.backend.generation.service.ScrapingService;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

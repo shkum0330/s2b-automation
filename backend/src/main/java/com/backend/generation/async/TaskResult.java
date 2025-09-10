@@ -1,4 +1,4 @@
-package com.backend.dto.async;
+package com.backend.generation.async;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.Getter;

@@ -1,4 +1,4 @@
-package com.backend.config;
+package com.backend.global.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.context.annotation.Bean;

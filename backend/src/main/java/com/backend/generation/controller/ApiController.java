@@ -1,10 +1,10 @@
-package com.backend.controller;
+package com.backend.generation.controller;
 
-import com.backend.dto.GenerateRequest;
-import com.backend.dto.GenerateResponse;
-import com.backend.dto.async.TaskResult;
-import com.backend.service.GenerationService;
-import com.backend.service.TaskService;
+import com.backend.generation.dto.GenerateRequest;
+import com.backend.generation.dto.GenerateResponse;
+import com.backend.generation.async.TaskResult;
+import com.backend.generation.service.GenerationService;
+import com.backend.generation.service.TaskService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;

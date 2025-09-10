@@ -1,6 +1,6 @@
-package com.backend.service;
+package com.backend.generation.service;
 
-import com.backend.service.util.CountryCode;
+import com.backend.global.util.CountryCode;
 import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;

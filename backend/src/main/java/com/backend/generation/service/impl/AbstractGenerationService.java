@@ -1,11 +1,11 @@
-package com.backend.service.impl;
+package com.backend.generation.service.impl;
 
-import com.backend.dto.CertificationResponse;
-import com.backend.dto.GenerateResponse;
-import com.backend.exception.GenerateApiException;
-import com.backend.service.GenerationService;
-import com.backend.service.util.PromptBuilder;
-import com.backend.service.ScrapingService;
+import com.backend.generation.dto.CertificationResponse;
+import com.backend.generation.dto.GenerateResponse;
+import com.backend.global.exception.GenerateApiException;
+import com.backend.generation.service.GenerationService;
+import com.backend.global.util.PromptBuilder;
+import com.backend.generation.service.ScrapingService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;

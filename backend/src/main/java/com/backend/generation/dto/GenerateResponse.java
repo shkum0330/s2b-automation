@@ -1,9 +1,6 @@
-package com.backend.dto;
+package com.backend.generation.dto;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
-
-import java.util.List;
 
 @Data
 public class GenerateResponse {

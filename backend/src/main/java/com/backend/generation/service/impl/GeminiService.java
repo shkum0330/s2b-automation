@@ -1,7 +1,7 @@
-package com.backend.service.impl;
+package com.backend.generation.service.impl;
 
-import com.backend.service.util.PromptBuilder;
-import com.backend.service.ScrapingService;
+import com.backend.global.util.PromptBuilder;
+import com.backend.generation.service.ScrapingService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Primary;

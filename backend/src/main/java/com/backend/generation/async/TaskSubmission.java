@@ -1,4 +1,4 @@
-package com.backend.dto.async;
+package com.backend.generation.async;
 
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;

@@ -1,7 +1,7 @@
-package com.backend.service;
+package com.backend.generation.service;
 
-import com.backend.dto.GenerateResponse;
-import com.backend.exception.GenerateApiException;
+import com.backend.generation.dto.GenerateResponse;
+import com.backend.global.exception.GenerateApiException;
 
 import java.util.concurrent.CompletableFuture;
 

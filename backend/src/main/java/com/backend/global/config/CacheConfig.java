@@ -1,6 +1,6 @@
-package com.backend.config;
+package com.backend.global.config;
 
-import com.backend.dto.GenerateResponse;
+import com.backend.generation.dto.GenerateResponse;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import org.springframework.context.annotation.Bean;

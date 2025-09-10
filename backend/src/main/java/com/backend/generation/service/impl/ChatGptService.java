@@ -1,4 +1,4 @@
-package com.backend.service.impl;
+package com.backend.generation.service.impl;
 
 import org.springframework.stereotype.Service;
 

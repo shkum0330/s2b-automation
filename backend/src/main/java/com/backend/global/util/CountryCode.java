@@ -1,4 +1,4 @@
-package com.backend.service.util;
+package com.backend.global.util;
 
 import java.util.Arrays;
 import java.util.Map;

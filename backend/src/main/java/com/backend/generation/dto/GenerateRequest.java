@@ -1,4 +1,4 @@
-package com.backend.dto;
+package com.backend.generation.dto;
 
 import lombok.Data;
 

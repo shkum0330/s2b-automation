@@ -1,7 +1,7 @@
-package com.backend.service;
+package com.backend.generation.service;
 
-import com.backend.dto.GenerateResponse;
-import com.backend.dto.async.TaskResult;
+import com.backend.generation.dto.GenerateResponse;
+import com.backend.generation.async.TaskResult;
 import com.github.benmanes.caffeine.cache.Cache;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

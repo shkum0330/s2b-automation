@@ -1,4 +1,4 @@
-package com.backend.dto.async;
+package com.backend.generation.async;
 
 public enum TaskStatus {
     RUNNING,
