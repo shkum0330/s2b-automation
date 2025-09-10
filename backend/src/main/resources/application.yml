@@ -1,0 +1,57 @@
+server:
+  port: 8080
+
+spring:
+  datasource:
+    url: ${DB_PASSWORD}
+    username: ${DB_USERNAME}
+    password:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate # 앱 실행 시 엔티티와 DB 스키마가 일치하는지 검증, 불일치 시 실패
+    properties:
+      hibernate:
+        format_sql: true # SQL 쿼리를 보기 좋게 포맷팅하여 로그에 출력
+    show-sql: true # 실행되는 SQL 쿼리를 로그에 출력
+
+  config:
+    import: env.yml
+
+management:
+  server:
+    port: 9292
+  endpoints:
+    web:
+      exposure:
+        include: health, info, prometheus, loggers, metrics
+
+  endpoint:
+    health:
+      show-details: always
+  info:
+    java:
+      enabled: true
+    os:
+      enabled: true
+    git:
+      mode: "full"
+    build:
+      enabled: true
+
+gemini:
+  api:
+    url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent
+    key: ${GEMINI_API_KEY}
+
+chatgpt:
+  api:
+    url: https://api.openai.com/v1/chat/completions
+    key: ${CHATGPT_API_KEY}
+
+logging:
+  level:
+    org:
+      hibernate:
+        SQL: debug # SQL과 파라미터를 함께 로그에 출력
