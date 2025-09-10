@@ -45,7 +45,7 @@ class ScrapingServiceTest {
     }
 
     @Test
-    @DisplayName("원산지 테스트 성공: 실제 스크래핑으로 국가코드(TH)를 가져온다")
+    @DisplayName("원산지 테스트 성공: 실제 스크래핑으로 국가코드(를 가져온다")
     void findCountryOfOrigin_success() {
         // given
         String modelName = "AX033B310GBD";
@@ -68,7 +68,6 @@ class ScrapingServiceTest {
 
         // when
         Optional<String> actualCountryCodeOpt = scrapingService.findCountryOfOrigin(modelName);
-
         // then
         assertFalse(actualCountryCodeOpt.isPresent(), "존재하지 않는 모델명 검색 시 국가코드 결과가 비어있어야 합니다.");
     }

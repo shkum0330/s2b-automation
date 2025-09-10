@@ -3,7 +3,9 @@ package com.backend.controller;
 import com.backend.dto.CertificationResponse;
 import com.backend.dto.GenerateRequest;
 import com.backend.dto.GenerateResponse;
+import com.backend.dto.async.TaskResult;
 import com.backend.service.GenerationService;
+import com.backend.service.TaskService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -23,35 +25,49 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture; // CompletableFuture import
+import java.util.concurrent.Executor;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.document;
 import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.documentationConfiguration;
 import static org.springframework.restdocs.operation.preprocess.Preprocessors.*;
 import static org.springframework.restdocs.payload.PayloadDocumentation.*;
+import static org.springframework.restdocs.request.RequestDocumentation.parameterWithName;
+import static org.springframework.restdocs.request.RequestDocumentation.pathParameters;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(ApiController.class)
 @ExtendWith(RestDocumentationExtension.class)
 @Import(ApiControllerTest.TestConfig.class)
 class ApiControllerTest {
-
     @Autowired
     private MockMvc mockMvc;
-
     @Autowired
     private GenerationService generationService;
-
     @Autowired
     private ObjectMapper objectMapper;
+    @Autowired
+    private TaskService taskService;
 
     @TestConfiguration
     static class TestConfig {
         @Bean
         public GenerationService generationService() {
             return Mockito.mock(GenerationService.class);
+        }
+
+        @Bean
+        public TaskService taskService() {
+            return Mockito.mock(TaskService.class);
+        }
+
+        @Bean
+        public Executor taskExecutor() {
+            return Mockito.mock(Executor.class);
         }
     }
 
@@ -63,7 +79,7 @@ class ApiControllerTest {
     }
 
     @Test
-    @DisplayName("제품 사양 정보 생성 API 문서화 테스트")
+    @DisplayName("제품 사양 정보 생성 API")
     void generateSpecification() throws Exception {
         // given - 문서화를 위한 요청 및 응답 객체 설정
         GenerateRequest request = new GenerateRequest();
@@ -85,8 +101,7 @@ class ApiControllerTest {
         response.setCertificationNumber(certResponse);
 
         // 서비스가 CompletableFuture를 반환하도록 Mocking
-        when(generationService.generateSpec(any(), any(), any()))
-                .thenReturn(CompletableFuture.completedFuture(response));
+        when(generationService.generateSpec(any(), any(), any())).thenReturn(CompletableFuture.completedFuture(response));
 
         // when & then & andDo(document)
         mockMvc.perform(RestDocumentationRequestBuilders.post("/api/generate-spec")
@@ -101,7 +116,6 @@ class ApiControllerTest {
                                 fieldWithPath("specExample").description("참고할 규격의 형식 예시"),
                                 fieldWithPath("productNameExample").description("참고할 물품명의 형식 예시 (선택 사항)")
                         ),
-                        // (수정) 중첩된 certification 객체 구조에 맞게 문서 경로 수정
                         responseFields(
                                 fieldWithPath("productName").description("AI가 생성한 물품명"),
                                 fieldWithPath("specification").description("AI가 생성한 규격"),
@@ -109,9 +123,29 @@ class ApiControllerTest {
                                 fieldWithPath("manufacturer").description("제조사"),
                                 fieldWithPath("countryOfOrigin").description("원산지"),
                                 fieldWithPath("g2bClassificationNumber").description("G2B 물품목록번호"),
-                                fieldWithPath("certification").description("인증 정보 객체"),
                                 fieldWithPath("katsCertificationNumber").description("국가기술표준원 전기안전인증번호"),
                                 fieldWithPath("kcCertificationNumber").description("KC 전파적합성인증번호")
+                        )
+                ));
+    }
+
+    @Test
+    @DisplayName("작업 취소 API")
+    void cancelTask() throws Exception {
+        String taskId = UUID.randomUUID().toString();
+        when(taskService.cancelTask(anyString())).thenReturn(true);
+
+        mockMvc.perform(RestDocumentationRequestBuilders.post("/api/cancel/{taskId}", taskId)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andDo(document("cancel-task",
+                        preprocessRequest(prettyPrint()),
+                        preprocessResponse(prettyPrint()),
+                        pathParameters(
+                                parameterWithName("taskId").description("취소할 작업의 ID")
+                        ),
+                        responseFields(
+                                fieldWithPath("success").description("작업 취소 성공 여부")
                         )
                 ));
     }

@@ -30,7 +30,6 @@ public class ScrapingService {
 
     private final Random random = new Random();
 
-    // G2B 물품목록번호를 찾는 기존 메서드 (Optional<String> 반환하도록 수정)
     public Optional<String> findG2bClassificationNumber(String modelName) {
         try {
             Document doc = getScrapingDocument(modelName);
@@ -41,6 +40,7 @@ public class ScrapingService {
                 return Optional.empty();
             }
 
+            // 올바른 제품인지 하이라이트 키워드로 검증
             Element highlightElement = firstResultItem.selectFirst("span.searchKeyword");
 
             if (highlightElement != null) {
@@ -63,21 +63,33 @@ public class ScrapingService {
         }
     }
 
-    // 원산지(국가 코드)를 스크래핑
     public Optional<String> findCountryOfOrigin(String modelName) {
         try {
             Document doc = getScrapingDocument(modelName);
-            // 링크(a) 태그가 아닌, 전체 텍스트를 포함하는 상위 div 태그를 선택
-            Element titleDiv = doc.selectFirst("div.searchListImgTit");
+            Element firstResultItem = doc.selectFirst("ul.bb_d7dbe4 > li:first-child");
 
-            if (titleDiv == null) {
+            if (firstResultItem == null) {
                 log.info("원산지 검색 결과가 없습니다. (모델명: {})", modelName);
                 return Optional.empty();
             }
 
-            String fullText = titleDiv.text(); // 예: "공기청정기, 삼성전자, (TH)AX033B310GBD, 33.1㎡, 26W"
+            // 1. 먼저, 이 항목이 우리가 찾는 제품이 맞는지 하이라이트 키워드로 검증합니다.
+            Element highlightElement = firstResultItem.selectFirst("span.searchKeyword");
 
-            // 정규표현식을 사용하여 (XX) 형식의 국가 코드를 찾음
+            if (highlightElement == null) {
+                log.info("원산지 스크래핑 결과: 첫 항목에 하이라이트된 검색어가 없어 건너뜁니다. (모델명: {})", modelName);
+                return Optional.empty();
+            }
+
+            // 2. 검증이 끝났으면, 국가 코드가 포함된 'div.searchListImgTit' 요소의 텍스트를 가져옵니다.
+            Element titleDiv = firstResultItem.selectFirst("div.searchListImgTit");
+
+            if (titleDiv == null) {
+                log.info("원산지 스크래핑 결과: 제목 div를 찾을 수 없습니다. (모델명: {})", modelName);
+                return Optional.empty();
+            }
+
+            String fullText = titleDiv.text();
             Pattern pattern = Pattern.compile("\\(([A-Z]{2})\\)");
             Matcher matcher = pattern.matcher(fullText);
 
@@ -86,7 +98,8 @@ public class ScrapingService {
                 log.info("원산지 스크래핑 성공: 국가코드 '{}'를 찾았습니다.", countryCode);
 
                 // 찾은 국가 코드를 CountryCode Enum을 사용해 국가명으로 변환
-                return CountryCode.fromCode(countryCode).map(CountryCode::getCountryName);
+                return CountryCode.fromCode(countryCode)
+                        .map(CountryCode::getCountryName);
 
             } else {
                 log.info("원산지 스크래핑 결과: 텍스트에서 국가코드를 찾을 수 없습니다. (전체 텍스트: {})", fullText);
@@ -99,9 +112,8 @@ public class ScrapingService {
         }
     }
 
-    // 중복되는 Jsoup 접속 로직을 별도 메서드로 분리
     private Document getScrapingDocument(String modelName) throws Exception {
-        TimeUnit.MILLISECONDS.sleep(1000 + random.nextInt(2000));
+        TimeUnit.MILLISECONDS.sleep(1000 + random.nextInt(1000));
         String encodedModelName = URLEncoder.encode(modelName, StandardCharsets.UTF_8);
         String searchUrl = NARA_SEARCH_URL + encodedModelName;
         log.info("Scraping at: {}", searchUrl);

@@ -67,7 +67,7 @@ public class TaskService {
     public boolean cancelTask(String taskId) {
         CompletableFuture<GenerateResponse> future = taskCache.getIfPresent(taskId);
         if (future != null && !future.isDone()) {
-            // true 파라미터는 실행 중인 스레드를 인터럽트 하려고 시도
+            // true 파라미터는 실행 중인 스레드를 인터럽트하려고 시도
             boolean cancelled = future.cancel(true);
             if (cancelled) {
                 log.info("Task {} 성공적으로 취소됨", taskId);
