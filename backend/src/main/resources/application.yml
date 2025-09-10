@@ -1,0 +1,66 @@
+server:
+  port: 8080
+
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/s2b_automation?useSSL=false&serverTimezone=Asia/Seoul
+    username: root
+    password:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate # 애플리케이션 실행 시 엔티티와 테이블을 비교하여 변경 사항을 자동 반영
+    properties:
+      hibernate:
+        format_sql: true # SQL 쿼리를 보기 좋게 포맷팅하여 로그에 출력
+    show-sql: true # 실행되는 SQL 쿼리를 로그에 출력
+
+  ai:
+    google:
+      gemini:
+        api-key: ${GEMINI_API_KEY}
+        chat:
+          model: gemini-1.5-pro-latest
+          options:
+            temperature: 0.3
+            max-output-tokens: 8192
+  config:
+    import: env.yml
+
+management:
+  server:
+    port: 9292
+  endpoints:
+    web:
+      exposure:
+        include: health, info, prometheus, loggers, metrics
+
+  endpoint:
+    health:
+      show-details: always
+  info:
+    java:
+      enabled: true
+    os:
+      enabled: true
+    git:
+      mode: "full"
+    build:
+      enabled: true
+
+gemini:
+  api:
+    url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent
+    key: ${GEMINI_API_KEY}
+
+chatgpt:
+  api:
+    url: https://api.openai.com/v1/chat/completions
+    key: ${CHATGPT_API_KEY}
+
+logging:
+  level:
+    org:
+      hibernate:
+        SQL: debug # SQL과 파라미터를 함께 로그에 출력
