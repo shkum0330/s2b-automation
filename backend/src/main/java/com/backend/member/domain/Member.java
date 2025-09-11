@@ -16,7 +16,7 @@ import java.time.LocalDate;
 public class Member extends BaseTimeEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "member_id") // ❗️실제 DB 컬럼명을 'member_id'로 매핑
+    @Column(name = "member_id")
     private Long id;
 
     @Column(nullable = false, unique = true, length = 50)
