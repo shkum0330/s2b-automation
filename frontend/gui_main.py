@@ -158,7 +158,7 @@ class S2BApp(QWidget):
 
         payload = {"model": model, "specExample": spec_example, "productNameExample": product_name_example}
         headers = {"Content-Type": "application/json"}
-        self.worker = ApiWorker('POST', 'http://localhost:8080/api/generate-spec', payload=payload, headers=headers,
+        self.worker = ApiWorker('POST', 'http://localhost:8080/api/v1/generation/generate-spec', payload=payload, headers=headers,
                                 timeout=65)
         self.worker.finished.connect(self.handle_task_start_response)
         self.worker.start()
@@ -178,7 +178,7 @@ class S2BApp(QWidget):
         if not self.current_task_id:
             return
 
-        url = f"http://localhost:8080/api/result/{self.current_task_id}"
+        url = f"http://localhost:8080/api/v1/generation/result/{self.current_task_id}"
         self.worker = ApiWorker('GET', url, timeout=5)
         self.worker.finished.connect(self.handle_polling_response)
         self.worker.start()
@@ -209,7 +209,7 @@ class S2BApp(QWidget):
         self.status_label.setStyleSheet("color: orange;")
         self.cancel_button.setEnabled(False)
 
-        url = f"http://localhost:8080/api/cancel/{self.current_task_id}"
+        url = f"http://localhost:8080/api/v1/generation/cancel/{self.current_task_id}"
         self.worker = ApiWorker('POST', url, timeout=10)
         self.worker.finished.connect(self.handle_cancel_response)
         self.worker.start()

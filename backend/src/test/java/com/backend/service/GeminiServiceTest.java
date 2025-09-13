@@ -1,7 +1,7 @@
 package com.backend.service;
 
-import com.backend.generation.dto.GenerateResponse;
-import com.backend.generation.service.impl.GeminiService;
+import com.backend.domain.generation.dto.GenerateResponse;
+import com.backend.domain.generation.service.impl.GeminiService;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
