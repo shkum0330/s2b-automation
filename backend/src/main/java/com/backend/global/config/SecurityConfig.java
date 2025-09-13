@@ -83,7 +83,7 @@ public class SecurityConfig {
                                 "/favicon.ico",
                                 "/api/v1/auth/callback/kakao",
                                 "/api/v1/auth/token",
-                                "/actuator/health",
+                                "/actuator/*",
                                 "/ping",
                                 "/error"
                         ).permitAll()
