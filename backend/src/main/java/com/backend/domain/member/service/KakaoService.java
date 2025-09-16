@@ -4,6 +4,7 @@ import com.backend.domain.member.dto.KakaoRegisterResultDto;
 import com.backend.domain.member.dto.KakaoUserInfoDto;
 import com.backend.domain.member.dto.LoginResponseDto;
 import com.backend.domain.member.entity.Member;
+import com.backend.domain.member.entity.Role;
 import com.backend.domain.member.repository.MemberRepository;
 import com.backend.global.auth.entity.MemberDetails;
 import com.backend.global.auth.jwt.JwtProvider;
@@ -192,11 +193,13 @@ public class KakaoService {
             throw ConflictException.emailAlreadyInUse(sameEmailUser.getEmail());
         }
 
-        // 3. 신규 카카오 회원 등록 (멤버 먼저 저장 후 memberId를 키값으로 s3에 사진 업로드)
+        // 3. 신규 카카오 회원 등록
         kakaoUser = Member.builder()
+                .name(kakaoUserInfo.getNickname())
                 .email(kakaoUserInfo.getEmail())
                 .provider(PROVIDER_KAKAO)
                 .providerId(kakaoUserInfo.getId())
+                .role(Role.FREE_USER)
                 .build();
 
         Member savedMember = memberRepository.save(kakaoUser);
@@ -212,5 +215,4 @@ public class KakaoService {
         Authentication authentication = new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
         SecurityContextHolder.getContext().setAuthentication(authentication);
     }
-
 }

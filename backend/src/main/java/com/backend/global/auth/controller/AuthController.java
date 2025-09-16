@@ -27,7 +27,7 @@ public class AuthController {
     @GetMapping("/callback/kakao")
     public ResponseEntity<?> kakaoLogin(@RequestParam(name = "code") String code, HttpServletResponse response) throws IOException {
         LoginResponseDto dto = kakaoService.kakaoLogin(code, response);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(dto);
     }
 
     /**

@@ -1,0 +1,16 @@
+jwt:
+  token:
+    secretKey: ${JWT_TOKEN_SECRETKEY}
+
+logging:
+  level:
+    org:
+      springframework:
+        jdbc: debug
+        security: info
+      com.zaxxer.hikari: debug
+
+kakao:
+  client-id: 7a67e9cf21317084df575359a9a70221
+  redirect-uri: http://localhost:8080/api/v1/auth/callback/kakao
+  client-secret: Xb0ZTaViA9d4p1TbLd8xK5VzI8qtL99f
