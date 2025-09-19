@@ -8,6 +8,7 @@ reviews:
   review_status: true
   collapse_walkthrough: false
   auto_review:
+    base_branches: ["*"]
     enabled: true
     drafts: false
 chat:
