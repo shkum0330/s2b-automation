@@ -22,6 +22,19 @@ import java.util.List;
 @Slf4j(topic = "AnonymousAuthenticationFilter")
 public class AnonymousAuthenticationFilter extends OncePerRequestFilter {
 
+    /**
+     * Ensures the current request has an Authentication in the SecurityContext and continues the filter chain.
+     *
+     * <p>If the SecurityContext has no Authentication, an anonymous Authentication is created and installed
+     * on a new SecurityContext before proceeding. If an Authentication already exists, the SecurityContext
+     * is left unchanged. The method always delegates to the provided FilterChain.</p>
+     *
+     * @param req the current HTTP request
+     * @param res the current HTTP response
+     * @param filterChain the filter chain to continue processing the request
+     * @throws ServletException if an error occurs during filtering
+     * @throws IOException if an I/O error occurs during filtering
+     */
     @Override
     protected void doFilterInternal(HttpServletRequest req, HttpServletResponse res, FilterChain filterChain) throws ServletException, IOException {
         if (SecurityContextHolder.getContext().getAuthentication() == null) {
@@ -44,6 +57,14 @@ public class AnonymousAuthenticationFilter extends OncePerRequestFilter {
         filterChain.doFilter(req, res);
     }
 
+    /**
+     * Constructs and returns an AnonymousAuthenticationToken representing an anonymous user.
+     *
+     * The token uses principal "anonymousUser", key "anonymousKey", and a single authority "ROLE_ANONYMOUS".
+     *
+     * @param request the current HTTP request (not used when creating the token)
+     * @return an Authentication (AnonymousAuthenticationToken) for an anonymous user
+     */
     private Authentication createAuthentication(HttpServletRequest request) {
         // 익명 사용자 principal 설정
         String anonymousPrincipal = "anonymousUser";

@@ -10,6 +10,16 @@ class ApiWorker(QThread):
 
     # ApiWorker 초기화
     def __init__(self, method, url, payload=None, headers=None, timeout=65):
+        """
+        Initialize the ApiWorker.
+        
+        Parameters:
+            method (str): HTTP method to use (e.g., 'GET', 'POST'). For 'POST', `payload` will be sent as JSON.
+            url (str): Target request URL.
+            payload (optional): JSON-serializable body sent with POST requests.
+            headers (dict, optional): HTTP headers to include with the request.
+            timeout (int | float, optional): Request timeout in seconds (default: 65).
+        """
         super().__init__()
         self.method = method
         self.url = url
@@ -19,6 +29,18 @@ class ApiWorker(QThread):
 
     # 스레드 시작 시 자동으로 실행되는 메인 로직
     def run(self):
+        """
+        Execute the HTTP request in the worker thread and emit the `finished` signal with the outcome.
+        
+        Performs a POST (when self.method == 'POST') or GET request to self.url using self.payload, self.headers, and self.timeout, then emits `self.finished` with a result dictionary. On success the emitted dict is:
+            {'ok': True, 'json': <parsed JSON response>, 'headers': <response headers dict>}
+        
+        On failure (any requests.exceptions.RequestException) the emitted dict is:
+            {'ok': False, 'error': <exception string>, ...}
+        If the exception includes a response, the dict will include either 'json' with the parsed error JSON or 'text' with the raw response body.
+        
+        This method runs inside the QThread and does not return a value; consumers must listen to the `finished` signal for results.
+        """
         try:
             if self.method.upper() == 'POST':
                 response = requests.post(self.url, json=self.payload, headers=self.headers, timeout=self.timeout)

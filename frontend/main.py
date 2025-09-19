@@ -12,6 +12,11 @@ from api_worker import ApiWorker
 class MainController:
     # 컨트롤러 초기화
     def __init__(self):
+        """
+        Initialize the MainController.
+        
+        Sets up the login UI, initializes placeholders for the main window, API worker, and access token, and connects the login window's `login_success` signal to the controller's `process_login` handler so authentication requests are started when a user logs in.
+        """
         self.login_win = LoginWindow()
         self.main_win = None  # main_win을 None으로 초기화
         self.api_worker = None
@@ -21,10 +26,25 @@ class MainController:
 
     # 로그인 윈도우를 화면에 표시
     def show_login_window(self):
+        """
+        Show the login window.
+        
+        Makes the existing LoginWindow instance visible. No return value.
+        """
         self.login_win.show()
 
     # LoginWindow에서 받은 auth_code로 백엔드에 최종 로그인 요청
     def process_login(self, auth_code):
+        """
+        Exchange an OAuth authorization code for an access token by starting an ApiWorker request.
+        
+        Starts an asynchronous GET request to the backend callback endpoint using the provided `auth_code`,
+        stores the worker on `self.api_worker`, and connects its finished signal to `handle_login_response`
+        so the response will be processed when the request completes.
+        
+        Parameters:
+            auth_code (str): OAuth authorization code received from the provider.
+        """
         url = f"http://localhost:8080/api/v1/auth/callback/kakao?code={auth_code}"
         self.api_worker = ApiWorker('GET', url)
         self.api_worker.finished.connect(self.handle_login_response)
@@ -32,6 +52,26 @@ class MainController:
 
     # 백엔드 로그인 요청의 응답 처리
     def handle_login_response(self, response):
+        """
+        Handle the result of the backend login request, update controller state, and transition to the main window on success.
+        
+        Parameters:
+            response (dict): Response object returned by ApiWorker with the following expected keys:
+                - 'ok' (bool): True if the request succeeded.
+                - 'json' (dict, optional): Parsed response body; may contain a 'message' key used for error display.
+                - 'headers' (dict, optional): Response headers; the 'Authorization' header is used as the access token.
+        
+        Behavior:
+            - If 'ok' is falsy, displays a critical error message using the message from response['json']['message'] if available, otherwise a default message, and returns.
+            - If the response indicates success, extracts the 'Authorization' header and stores it on self.access_token.
+            - If an access token is obtained, calls self.show_main_window(access_token).
+            - If no access token is present, displays a critical error message indicating the token was not received.
+        
+        Side effects:
+            - Mutates self.access_token.
+            - May show QMessageBox dialogs.
+            - May open the main application window via self.show_main_window.
+        """
         if not response.get('ok'):
             error_msg = response.get('json', {}).get('message', '알 수 없는 로그인 오류')
             QMessageBox.critical(self.login_win, "로그인 실패", error_msg)
@@ -52,6 +92,14 @@ class MainController:
     def show_main_window(self, access_token):
         # --- 수정된 부분 ---
         # MainWindow를 새로 생성하며 access_token 전달
+        """
+        Show the main application window, creating it if necessary, and close the login window.
+        
+        If a MainWindow instance does not yet exist, instantiate it with the provided access_token (used for authenticated backend requests). Then close the login window and display the main window.
+        
+        Parameters:
+            access_token (str): Authorization token to pass to the MainWindow for authenticated operations.
+        """
         if self.main_win is None:
             self.main_win = MainWindow(access_token=access_token)
 

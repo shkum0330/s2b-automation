@@ -34,12 +34,31 @@ public class JwtProvider {
     private String SECRET_KEY;
     private Key key;
 
+    /**
+     * Initializes the cryptographic signing key used for JWT operations.
+     *
+     * Decodes the configured base64-encoded SECRET_KEY and builds an HMAC-SHA key
+     * suitable for signing and verifying JWTs (HS256). Executed once after the
+     * component is constructed (@PostConstruct).
+     *
+     * Preconditions: SECRET_KEY must be a valid base64-encoded secret of adequate
+     * length for the HMAC-SHA algorithm.
+     */
     @PostConstruct
     public void init() {
         byte[] keyBytes = Decoders.BASE64.decode(SECRET_KEY);
         this.key = Keys.hmacShaKeyFor(keyBytes);
     }
 
+    /**
+     * Extracts a Bearer token from the specified HTTP header.
+     *
+     * If the header value is present and starts with "Bearer ", the prefix is removed and the remaining token is returned.
+     *
+     * @param request    the HTTP request to read the header from
+     * @param headerName the name of the header that may contain a Bearer token (e.g. "Authorization")
+     * @return the token string without the "Bearer " prefix, or {@code null} if the header is missing or not Bearer-formatted
+     */
     public String getTokenFromRequest(HttpServletRequest request, String headerName) {
         String bearerToken = request.getHeader(headerName);
         if (StringUtils.hasText(bearerToken) && bearerToken.startsWith("Bearer ")) {
@@ -49,6 +68,17 @@ public class JwtProvider {
     }
 
 
+    /**
+     * Creates a signed access JWT for the given user and role.
+     *
+     * The token's subject is the provided email, it contains a "role" claim, and is
+     * issued with the configured access-token expiration. The returned string is
+     * prefixed with "Bearer ".
+     *
+     * @param email the user's email to set as the JWT subject
+     * @param role  the user's role added to the token as the "role" claim
+     * @return a Bearer-prefixed JWT access token (signed with the configured HS256 key)
+     */
     public String createAccessToken(String email, Role role) {
         return BEARER_PREFIX + Jwts.builder()
                 .setSubject(email)
@@ -59,6 +89,16 @@ public class JwtProvider {
                 .compact();
     }
 
+    /**
+     * Creates a signed refresh JWT and returns it prefixed with "Bearer ".
+     *
+     * The token's subject is set to the provided email and it contains a "role" claim.
+     * Its expiration is determined by REFRESH_TOKEN_EXPIRATION_TIME.
+     *
+     * @param email the subject (user identifier) to embed in the token
+     * @param role  the user's role stored as the "role" claim
+     * @return a complete refresh token string prefixed with "Bearer "
+     */
     public String createRefreshToken(String email, Role role) {
 
         return BEARER_PREFIX + Jwts.builder()
@@ -70,6 +110,15 @@ public class JwtProvider {
                 .compact();
     }
 
+    /**
+     * Validates the given JWT string and returns its parsed claims.
+     *
+     * Accepts either a raw JWT or a `Bearer `-prefixed value; the prefix will be stripped before validation.
+     *
+     * @param token the JWT value (may include the "Bearer " prefix)
+     * @return the token's Claims if validation succeeds
+     * @throws JwtException if the token is unsupported, malformed, expired, has an invalid signature, or is null/empty
+     */
     public Claims validateToken(String token) {
         String tokenValue = resolveToken(token);
 
@@ -97,16 +146,36 @@ public class JwtProvider {
         }
     }
 
+    /**
+     * Extracts and returns the JWT subject (typically the user's identifier/email).
+     *
+     * The provided token may include the "Bearer " prefix; it will be handled by the underlying claim parser.
+     *
+     * @param token the JWT string (optionally prefixed with "Bearer ")
+     * @return the subject claim from the token (e.g., user's email)
+     */
     public String getSubjectFromToken(String token) {
         Claims claims = getClaims(token);
         return claims.getSubject();
     }
 
+    /**
+     * Extracts the "role" claim from the provided JWT.
+     *
+     * @param token the JWT string (may include the "Bearer " prefix)
+     * @return the value of the "role" claim, or {@code null} if the claim is not present
+     */
     public String getRoleFromToken(String token) {
         Claims claims = getClaims(token);
         return claims.get("role", String.class);
     }
 
+    /**
+     * Parses the JWT (optionally prefixed with "Bearer ") and returns its claims.
+     *
+     * @param token the JWT string to parse; may include the leading "Bearer " prefix
+     * @return the token's Claims (the parsed JWT body)
+     */
     public Claims getClaims(String token) {
         if (token.startsWith("Bearer ")) {
             token = token.substring(7).trim();
@@ -118,6 +187,15 @@ public class JwtProvider {
                 .getBody();
     }
 
+    /**
+     * Encodes the given JWT and adds it to the HTTP response as a refresh-token cookie.
+     *
+     * The cookie is named using JwtProvider.REFRESH_TOKEN_HEADER, stores the URL-encoded token
+     * (spaces encoded as `%20`), is scoped to path "/", marked HttpOnly and Secure, uses
+     * SameSite=None, and has a max age of 7 days.
+     *
+     * @param token the JWT to store in the cookie
+     */
     public void addJwtToCookie(String token, HttpServletResponse res) {
         token = URLEncoder.encode(token, StandardCharsets.UTF_8).replaceAll("\\+", "%20");
         Cookie cookie = new Cookie(JwtProvider.REFRESH_TOKEN_HEADER, token);
@@ -132,6 +210,12 @@ public class JwtProvider {
         res.addCookie(cookie);
     }
 
+    /**
+     * Strips the "Bearer " prefix from a token value if present.
+     *
+     * @param bearerToken the raw header value that may start with "Bearer "; may be null
+     * @return the token without the "Bearer " prefix when present, or the original value (possibly null) otherwise
+     */
     private String resolveToken(String bearerToken) {
         if (bearerToken != null && bearerToken.startsWith("Bearer ")) {
             return bearerToken.substring(7);

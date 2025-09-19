@@ -37,11 +37,30 @@ public class SecurityConfig {
     private final MemberDetailsService memberDetailsService;
     private final AuthenticationConfiguration authenticationConfiguration;
 
+    /**
+     * Exposes the application's AuthenticationManager as a Spring bean by delegating to the injected AuthenticationConfiguration.
+     *
+     * @return the resolved AuthenticationManager
+     * @throws Exception if the AuthenticationManager cannot be obtained from the AuthenticationConfiguration
+     */
     @Bean
     public AuthenticationManager authenticationManager() throws Exception {
         return authenticationConfiguration.getAuthenticationManager();
     }
 
+    /**
+     * Creates a CorsConfigurationSource that applies permissive CORS settings to all endpoints.
+     *
+     * <p>Configured options:
+     * - Allowed origins: http://localhost:9292, http://localhost:8080
+     * - Allowed headers: all ("*")
+     * - Allowed methods: GET, POST, PUT, PATCH, DELETE, OPTIONS
+     * - Allows credentials
+     * - Exposes the "Authorization" response header
+     * - Preflight cache max age: 60 seconds
+     *
+     * @return a UrlBasedCorsConfigurationSource with the above CORS configuration registered for {@code /**}
+     */
     @Bean
     CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
@@ -58,6 +77,23 @@ public class SecurityConfig {
         return source;
     }
 
+    /**
+     * Configures and builds the application's SecurityFilterChain.
+     *
+     * <p>Sets up stateless JWT-based security:
+     * - Disables CSRF and form login.
+     * - Enables CORS using the configured CorsConfigurationSource.
+     * - Uses stateless session management.
+     * - Grants public access to common static resources, OPTIONS preflight requests,
+     *   a small set of unauthenticated endpoints (root, index, favicon, OAuth callback, token endpoint,
+     *   actuator, /ping, /error), and all GET requests under /api/v1/**.
+     * - Requires authentication for all other requests.
+     * - Registers the JwtAuthenticationFilter before UsernamePasswordAuthenticationFilter and
+     *   places an AnonymousAuthenticationFilter before the JWT filter to ensure anonymous principal handling.
+     *
+     * @return the built SecurityFilterChain reflecting the above configuration
+     * @throws Exception if the HttpSecurity configuration cannot be built
+     */
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         // 1. CSRF, CORS, 세션 관리 등 기본 설정

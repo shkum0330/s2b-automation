@@ -56,6 +56,17 @@ public class KakaoService {
 
     public static final String PROVIDER_KAKAO = "KAKAO";
 
+    /**
+     * Orchestrates the full Kakao OAuth login flow: exchanges the authorization code for an access token,
+     * fetches Kakao user info, registers the user if needed, performs programmatic login, issues JWTs,
+     * persists the refresh token, and returns a login summary.
+     *
+     * @param code     the Kakao OAuth authorization code received from the client redirect
+     * @param response the HTTP response used to add the access token header and a refresh-token cookie
+     * @return a LoginResponseDto containing the member ID, email, whether the member was newly registered,
+     *         and whether the member has profile information
+     * @throws IOException if an I/O error occurs while interacting with Kakao or writing to the response
+     */
     @Transactional
     public LoginResponseDto kakaoLogin(String code, HttpServletResponse response) throws IOException {
         log.info("kakao redirect uri : " + kakaoRedirectUri);
@@ -90,6 +101,18 @@ public class KakaoService {
                 .build();
     }
 
+    /**
+     * Exchanges an OAuth authorization code for a Kakao access token.
+     *
+     * Sends a form-encoded POST to Kakao's token endpoint using the provided
+     * redirectUri and returns the extracted access token string.
+     *
+     * @param code the authorization code received from Kakao
+     * @param redirectUri the redirect URI that was used in the OAuth authorization request
+     * @return the Kakao access token
+     * @throws JsonProcessingException if the token response cannot be parsed as JSON
+     * @throws AuthenticationException when the HTTP request to Kakao fails (wraps RestClientException)
+     */
     private String getToken(String code, String redirectUri) throws JsonProcessingException {
         try {
             URI uri = UriComponentsBuilder
@@ -129,6 +152,14 @@ public class KakaoService {
         }
     }
 
+    /**
+     * Fetches the Kakao user's profile from Kakao's /v2/user/me endpoint and returns a DTO with id, nickname, email, and profile image URL.
+     *
+     * @param accessToken the Kakao OAuth access token to send in the Authorization header
+     * @return a KakaoUserInfoDto populated with the Kakao user's id, nickname, email, and profile image URL
+     * @throws JsonProcessingException if the HTTP response body cannot be parsed as JSON
+     * @throws AuthenticationException if the request to Kakao's user API fails
+     */
     private KakaoUserInfoDto getKakaoUserInfo(String accessToken) throws JsonProcessingException {
         try {
             // 요청 URL 만들기
@@ -171,6 +202,21 @@ public class KakaoService {
         }
     }
 
+    /**
+     * Ensures a Member exists for the given Kakao user info: returns the existing Member if one is
+     * already linked by providerId, throws a conflict if the email is already used by another account,
+     * or creates and persists a new Member for the Kakao user.
+     *
+     * <p>Behavior:
+     * - If a Member with the same Kakao providerId exists, returns isNewMember=false with that Member.
+     * - If the email is already associated with a different account, throws ConflictException.emailAlreadyInUse.
+     * - Otherwise, creates a new Member with provider "KAKAO", role FREE_USER, persists it, and returns
+     *   isNewMember=true with the saved Member.
+     *
+     * @param kakaoUserInfo DTO containing the Kakao user id, nickname, and email used to identify or create the Member
+     * @return a KakaoRegisterResultDto indicating whether a new Member was created and the corresponding Member
+     * @throws ConflictException if the email from kakaoUserInfo is already registered to another account
+     */
     @Transactional
     protected KakaoRegisterResultDto registerKakaoUserIfNeeded(KakaoUserInfoDto kakaoUserInfo) {
         // 1. 기존 카카오 회원 확인
@@ -207,6 +253,15 @@ public class KakaoService {
                 .build();
     }
 
+    /**
+     * Programmatically authenticates the given Member for the current thread by creating a UserDetails-backed
+     * Authentication and placing it into the SecurityContext.
+     *
+     * This sets SecurityContextHolder.getContext().setAuthentication(...) so subsequent security checks
+     * treat the provided member as the currently authenticated principal.
+     *
+     * @param kakaoUser the Member to authenticate in the current security context
+     */
     private void forceLogin(Member kakaoUser) {
         UserDetails userDetails = new MemberDetails(kakaoUser);
         Authentication authentication = new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());

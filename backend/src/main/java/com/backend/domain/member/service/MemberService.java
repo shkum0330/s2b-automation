@@ -31,7 +31,19 @@ public class MemberService {
     private final JwtProvider jwtProvider;
     private final RefreshTokenService refreshTokenService;
 
-    // refresh token 사용하여 access token 재발급
+    /**
+     * Reissues an access token using a provided refresh token.
+     *
+     * Validates the provided refresh token (must be non-null and valid), extracts the subject email,
+     * verifies the refresh token matches the stored refresh token for that email (the method strips a
+     * "Bearer " prefix when comparing), and loads the corresponding Member. If verification succeeds,
+     * returns a newly created access token for the member's email and role.
+     *
+     * @param refreshToken the refresh token string, expected in the form "Bearer <token>"
+     * @return a newly created access token for the authenticated member
+     * @throws AuthenticationException if the refresh token is null or fails validation
+     * @throws NotFoundException if the stored refresh token or the Member for the token's email is not found
+     */
     @Transactional
     public String refreshAccessToken(String refreshToken) {
         if (refreshToken == null) {
@@ -56,7 +68,15 @@ public class MemberService {
     }
 
     /**
-     * refresh token의 Max age를 0으로 만들어 로그아웃 시키는 메서드
+     * Logs out a member by invalidating the provided refresh token.
+     *
+     * <p>Verifies the caller is an authenticated MemberDetails principal and that a non-null,
+     * valid refresh token is supplied, then removes the stored refresh token associated with
+     * the token's subject (email).</p>
+     *
+     * @param refreshToken the refresh token to invalidate (must be non-null and valid)
+     * @throws AuthenticationException if the refresh token is null, the current principal is not a member,
+     *                                 or the token is invalid/unacceptable
      */
     @Transactional
     public void logout(String refreshToken) {
@@ -75,8 +95,16 @@ public class MemberService {
     }
 
     /**
-     * 사용자 정보를 등록하는 서비스 메서드
-     */
+         * Updates and persists a member's basic profile information.
+         *
+         * The member's name and phone number are taken from the provided DTO, trimmed, set on the
+         * given Member entity, and then saved. The provided profileImage parameter is accepted but
+         * currently not used by this method.
+         *
+         * @param profileImage uploaded profile image (currently ignored)
+         * @param dto contains the new name and phone values to apply
+         * @param member the Member entity to update and persist
+         */
     @Transactional
     public void insertMemberInfo(MultipartFile profileImage, MemberInfoDto dto, Member member) throws IOException {
         member.setName(dto.getName().trim());

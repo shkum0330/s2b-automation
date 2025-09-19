@@ -14,6 +14,14 @@ import org.springframework.stereotype.Service;
 public class MemberDetailsService implements UserDetailsService {
     private final MemberRepository memberRepository;
 
+    /**
+     * Loads user details for Spring Security by member email.
+     *
+     * Looks up a Member by the provided email and returns a MemberDetails wrapper suitable for authentication.
+     *
+     * @param email the member's email used as the username; must correspond to an existing member
+     * @return a MemberDetails instance representing the found member
+     */
     @Override
     public MemberDetails loadUserByUsername(String email) throws UsernameNotFoundException {
         Member member = memberRepository.findByEmail(email)

@@ -9,6 +9,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class TestController {
 
+    /**
+     * GET /test endpoint that logs "api 정상 호출" for basic health-check/connection verification.
+     *
+     * <p>No request parameters and no response body (returns 200 OK by default).</p>
+     */
     @GetMapping("/test")
     public void test(){
         log.info("api 정상 호출");

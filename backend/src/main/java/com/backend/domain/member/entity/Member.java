@@ -45,6 +45,15 @@ public class Member extends BaseTimeEntity {
 
     private LocalDate lastRequestDate;
 
+    /**
+     * Constructs a Member with the supplied identity and authentication attributes.
+     *
+     * @param name       the member's display name
+     * @param email      the member's email (unique, non-null)
+     * @param provider   the authentication provider identifier (e.g., "google", "github")
+     * @param providerId the provider-specific user id (unique)
+     * @param role       the member's role/authorization level
+     */
     @Builder
     public Member(String name, String email, String provider, String providerId, Role role) {
         this.name = name;

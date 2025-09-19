@@ -11,6 +11,15 @@ import java.util.concurrent.TimeUnit;
 
 @Configuration
 public class CacheConfig {
+    /**
+     * Creates a Caffeine cache for tracking asynchronous generation tasks.
+     *
+     * <p>Keys are task IDs (String) and values are CompletableFuture&lt;GenerateResponse&gt; representing
+     * in-progress or completed asynchronous results. Entries expire 10 minutes after being written
+     * and the cache is capped at 1000 entries to limit concurrent tracked tasks.
+     *
+     * @return a configured Cache<String, CompletableFuture&lt;GenerateResponse&gt;>
+     */
     @Bean
     public Cache<String, CompletableFuture<GenerateResponse>> taskCache() {
         // 작업 완료/실패 후 10분 동안 결과를 유지하고 자동으로 제거

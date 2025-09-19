@@ -36,8 +36,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     );
 
     /**
-     * 이 필터를 건너뛸지 여부를 결정합니다.
-     * EXCLUDE_URIS에 포함된 경로는 이 필터의 로직을 실행하지 않습니다.
+     * Determine whether this filter should be skipped for the given request.
+     *
+     * Returns true for HTTP OPTIONS requests or when the request URI starts with any path listed in EXCLUDE_URIS.
+     *
+     * @return true if the filter should not run for the request; false otherwise
      */
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
@@ -48,6 +51,19 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         return EXCLUDE_URIS.stream().anyMatch(uri -> request.getRequestURI().startsWith(uri));
     }
 
+    /**
+     * Authenticates the incoming HTTP request using a JWT from the Authorization header and populates
+     * the SecurityContext with a UsernamePasswordAuthenticationToken when validation succeeds.
+     *
+     * <p>Behavior:
+     * - Extracts the access token from the request Authorization header via JwtProvider.
+     * - If no token is present, the request is delegated to the next filter without setting authentication.
+     * - If a token is present, validates it, extracts the subject (username), loads UserDetails and sets
+     *   the Authentication into the SecurityContext.
+     * - If validation or parsing fails, clears the SecurityContext and does not propagate the exception
+     *   (allows downstream Spring Security filters, e.g. ExceptionTranslationFilter, to handle it).
+     * - Always forwards the request to the next filter in the chain.
+     */
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
@@ -88,6 +104,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
     }
 
+    /**
+     * Populate the SecurityContext with an Authentication built from the given user details.
+     *
+     * Creates a UsernamePasswordAuthenticationToken using the provided UserDetails (no credentials)
+     * and the user's granted authorities, then sets it as the current Authentication in the
+     * SecurityContext.
+     *
+     * @param userDetails the authenticated user's details whose principal and authorities will be used
+     */
     private void setAuthentication(UserDetails userDetails) {
         Authentication authentication = new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
         SecurityContextHolder.getContext().setAuthentication(authentication);

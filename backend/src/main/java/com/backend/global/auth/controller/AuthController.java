@@ -22,7 +22,16 @@ public class AuthController {
     private final MemberService memberService;
 
     /**
-     * 카카오 로그인 처리 컨트롤러
+     * Handles the Kakao OAuth callback and completes user login.
+     *
+     * Exchanges the provided Kakao authorization `code` for user credentials via KakaoService,
+     * sets any required cookies/headers on the provided HttpServletResponse, and returns a
+     * LoginResponseDto in a 200 OK response.
+     *
+     * @param code the OAuth authorization code returned by Kakao
+     * @param response servlet response used to set cookies or headers required for the login session
+     * @return ResponseEntity containing a LoginResponseDto with login result details
+     * @throws IOException if an I/O error occurs while writing to the response
      */
     @GetMapping("/callback/kakao")
     public ResponseEntity<?> kakaoLogin(@RequestParam(name = "code") String code, HttpServletResponse response) throws IOException {
@@ -31,7 +40,14 @@ public class AuthController {
     }
 
     /**
-     * access token 재발급 요청 처리 컨트롤러
+     * Refreshes the access token using a refresh token from the "Refresh-token" cookie.
+     *
+     * <p>Delegates to MemberService to issue a new access token, then returns a 200 OK response
+     * with the new token placed in the response Authorization header (JwtProvider.AUTHORIZATION_HEADER)
+     * and a JSON body containing a confirmation message.</p>
+     *
+     * @param refreshToken the refresh token value read from the "Refresh-token" cookie
+     * @return a ResponseEntity with the Authorization header set to the newly issued access token
      */
     @PostMapping("/token")
     public ResponseEntity<?> refreshAccessToken(@CookieValue(name = "Refresh-token") String refreshToken) {
@@ -46,7 +62,14 @@ public class AuthController {
     }
 
     /**
-     * 로그아웃 처리 컨트롤러
+     * Logs out the current user by invalidating server-side session state and removing the refresh-token cookie.
+     *
+     * Calls MemberService.logout with the provided refresh token, then adds a cleared (empty, Max-Age=0) cookie
+     * named by JwtProvider.REFRESH_TOKEN_HEADER with Path=/, HttpOnly, Secure and SameSite=None to the response.
+     *
+     * @param refreshToken the value of the "Refresh-token" cookie supplied by the client
+     * @param response the HttpServletResponse to which the cleared refresh-token cookie will be added
+     * @return ResponseEntity with HTTP 200 OK containing the HttpServletResponse
      */
     @PostMapping("/logout")
     public ResponseEntity<?> logout(@CookieValue(name = "Refresh-token") String refreshToken, HttpServletResponse response) {

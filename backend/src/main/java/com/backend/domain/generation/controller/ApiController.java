@@ -32,6 +32,21 @@ public class ApiController {
     // 동기 응답을 시도할 최대 대기 시간 (초)
     private static final long RESPONSE_TIMEOUT_SECONDS = 60;
 
+    /**
+     * Handles POST /generate-spec: starts asynchronous spec generation and attempts a short synchronous wait.
+     *
+     * <p>Accepts a GenerateRequest, submits the generation task to the TaskService and waits up to
+     * RESPONSE_TIMEOUT_SECONDS for completion. If the task completes within the timeout the generated
+     * GenerateResponse is returned with 200 OK. If the wait times out the request returns 202 Accepted
+     * with a body containing the submitted taskId so the client can poll for the result. Other outcomes:
+     * <ul>
+     *   <li>200 OK with a TaskResult indicating cancellation if the task was cancelled.</li>
+     *   <li>500 Internal Server Error with a TaskResult.failed message if the task failed during execution.</li>
+     *   <li>500 Internal Server Error with an error map if request processing was interrupted.</li>
+     * </ul>
+     *
+     * @param request the generation request containing the model, spec example, and product name example
+     */
     @PostMapping("/generate-spec")
     public ResponseEntity<?> generateSpecification(@RequestBody GenerateRequest request) {
         log.info(request.getModel());
