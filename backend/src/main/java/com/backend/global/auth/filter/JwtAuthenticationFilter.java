@@ -32,7 +32,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private static final List<String> EXCLUDE_URIS = List.of(
             "/api/v1/auth/callback/kakao",
             "/api/v1/auth/token",
-            "/",
             "/actuator/health"
     );
 
@@ -55,7 +54,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         // 1. 헤더에서 Access Token 추출
         String accessToken = jwtProvider.getTokenFromRequest(request, JwtProvider.AUTHORIZATION_HEADER);
-
+        log.info("accessToken: {}", accessToken);
         // 2. 토큰이 없는 경우, 다음 필터로 위임
         if (!StringUtils.hasText(accessToken)) {
             filterChain.doFilter(request, response);
@@ -70,7 +69,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             String username = jwtProvider.getSubjectFromToken(accessToken);
             UserDetails userDetails = detailsService.loadUserByUsername(username);
 
-            // ❗️ 역할(Role) 검증은 SecurityConfig의 .hasRole()에서 처리하는 것이 더 일반적입니다.
+            // 역할(Role) 검증은 SecurityConfig의 .hasRole()에서 처리하는 것이 더 일반적입니다.
             //    필요하다면 아래 로직을 유지할 수 있습니다.
             // validateUserRole(userDetails, jwtProvider.getRoleFromToken(accessToken));
 
@@ -82,7 +81,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             SecurityContextHolder.clearContext();
             log.warn("JWT 인증 실패: {}, 요청 URI: {}", e.getMessage(), request.getRequestURI());
             // 여기서 직접 response.setStatus()를 설정하기보다,
-            // Spring Security의 ExceptionTranslationFilter가 처리하도록 두는 것이 좋습니다.
+            // Spring Security의 ExceptionTranslationFilter가 처리하도록 두는 것이 좋다
         }
 
         // 6. 다음 필터로 요청 전달

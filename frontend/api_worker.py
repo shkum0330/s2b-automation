@@ -3,14 +3,12 @@
 import requests
 from PyQt5.QtCore import QThread, pyqtSignal
 
+# API 요청을 비동기적으로 처리하는 스레드
 class ApiWorker(QThread):
-    """
-    범용 ApiWorker
-    - 성공 시: {'ok': True, 'json': ..., 'headers': ...} 딕셔너리를 반환
-    - 실패 시: {'ok': False, 'error': ..., 'json': ...} 딕셔너리를 반환
-    """
+    # 작업 완료 신호
     finished = pyqtSignal(object)
 
+    # ApiWorker 초기화
     def __init__(self, method, url, payload=None, headers=None, timeout=65):
         super().__init__()
         self.method = method
@@ -19,6 +17,7 @@ class ApiWorker(QThread):
         self.headers = headers
         self.timeout = timeout
 
+    # 스레드 시작 시 자동으로 실행되는 메인 로직
     def run(self):
         try:
             if self.method.upper() == 'POST':
@@ -26,18 +25,19 @@ class ApiWorker(QThread):
             else:  # GET
                 response = requests.get(self.url, headers=self.headers, timeout=self.timeout)
 
+            # HTTP 에러 발생 시 예외 처리
             response.raise_for_status()
 
-            # 성공 시, 응답 본문과 헤더를 함께 딕셔너리로 묶어 반환
             result = {
                 'ok': True,
                 'json': response.json(),
                 'headers': dict(response.headers)
             }
+            # 작업 완료 후 결과와 함께 신호 발생
             self.finished.emit(result)
 
         except requests.exceptions.RequestException as e:
-            # 실패 시, 에러 정보와 함께 응답 본문(이 있을 경우)을 반환
+            # 모든 요청 관련 예외 처리
             error_result = {'ok': False, 'error': str(e)}
             if e.response is not None:
                 try:

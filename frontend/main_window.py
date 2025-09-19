@@ -5,15 +5,15 @@ from PyQt5.QtWidgets import (QWidget, QLabel, QLineEdit, QTextEdit,
                              QPushButton, QVBoxLayout, QGroupBox, QGridLayout,
                              QMessageBox, QHBoxLayout)
 from PyQt5.QtCore import Qt, QTimer
-
 from api_worker import ApiWorker
 
 
+# 로그인 후의 메인 UI를 담당하는 윈도우
 class MainWindow(QWidget):
-    # __init__ 메소드가 access_token을 받을 수 있도록 수정
+    # 메인 윈도우 초기화, MainController로부터 Access Token 전달 받음
     def __init__(self, access_token=None):
         super().__init__()
-        self.access_token = access_token  # 전달받은 토큰 저장
+        self.access_token = access_token
         self.worker = None
         self.current_task_id = None
         self.polling_timer = QTimer(self)
@@ -22,8 +22,8 @@ class MainWindow(QWidget):
         self.copy_buttons = {}
         self.initUI()
 
+    # 메인 윈도우의 모든 UI 요소 설정
     def initUI(self):
-        # UI 생성 로직은 변경 없음
         request_group = QGroupBox("서버에 보낼 정보")
         product_name_example_label = QLabel("1. 물품(용역)명:")
         self.product_name_example_input = QLineEdit()
@@ -95,6 +95,7 @@ class MainWindow(QWidget):
         self.setWindowTitle("S2B 상품 정보 AI 생성기")
         self.setGeometry(300, 300, 700, 800)
 
+    # 'AI로 결과 생성하기' 버튼 클릭 시 호출
     def start_api_call(self):
         model = self.model_input.text()
         spec_example = self.spec_example_input.toPlainText()
@@ -106,10 +107,9 @@ class MainWindow(QWidget):
 
         self.run_button.setEnabled(False)
         self.cancel_button.setEnabled(True)
-        self.status_label.setText("상태: 🤖 작업 시작 요청 중 (최대 65초 대기)...")
+        self.status_label.setText("상태: 🤖 작업 시작 요청 중...")
         self.clear_outputs()
 
-        # API 요청 시 헤더에 Access Token을 포함시킴
         headers = {
             "Content-Type": "application/json",
             "Authorization": self.access_token
@@ -122,6 +122,7 @@ class MainWindow(QWidget):
         self.worker.finished.connect(self.handle_task_start_response)
         self.worker.start()
 
+    # '/generate-spec' API의 초기 응답 처리
     def handle_task_start_response(self, result):
         if not result.get('ok'):
             self.handle_error(result.get('json', {}).get('message', result.get('error', '알 수 없는 오류')))
@@ -130,13 +131,14 @@ class MainWindow(QWidget):
         json_body = result.get('json', {})
         if "taskId" in json_body:
             self.current_task_id = json_body["taskId"]
-            self.status_label.setText(f"상태: ⏳ 폴링 시작 (ID: ...{self.current_task_id[-6:]}).")
+            self.status_label.setText(f"상태: ⏳ 폴링 시작...")
             self.polling_timer.start(3000)
         elif "productName" in json_body or json_body.get("status") == "COMPLETED":
             self.handle_api_result(json_body.get("result", json_body))
         else:
             self.handle_error(json_body.get("error") or json_body.get("message", "알 수 없는 응답"))
 
+    # 3초마다 AI 작업의 현재 상태를 서버에 확인(폴링)
     def check_task_status(self):
         if not self.current_task_id:
             return
@@ -147,6 +149,7 @@ class MainWindow(QWidget):
         self.worker.finished.connect(self.handle_polling_response)
         self.worker.start()
 
+    # 폴링 요청의 응답 처리
     def handle_polling_response(self, result):
         if not result.get('ok'):
             self.polling_timer.stop()
@@ -162,8 +165,9 @@ class MainWindow(QWidget):
             self.polling_timer.stop()
             self.handle_error(f"작업 실패 또는 취소됨 (상태: {status})")
         else:
-            self.status_label.setText(f"상태: ⏳ 작업 진행 중... (ID: ...{self.current_task_id[-6:]}).")
+            self.status_label.setText(f"상태: ⏳ 작업 진행 중...")
 
+    # '취소' 버튼 클릭 시 호출
     def cancel_api_call(self):
         if not self.current_task_id:
             return
@@ -176,6 +180,7 @@ class MainWindow(QWidget):
         self.worker.finished.connect(self.handle_cancel_response)
         self.worker.start()
 
+    # 취소 요청의 응답 처리
     def handle_cancel_response(self, result):
         if result.get('ok') and result.get('json', {}).get("success"):
             self.status_label.setText("상태: ❌ 작업이 성공적으로 취소되었습니다.")
@@ -185,6 +190,7 @@ class MainWindow(QWidget):
         self.cancel_button.setEnabled(False)
         self.current_task_id = None
 
+    # 최종 API 결과를 UI 결과창에 채워 넣음
     def handle_api_result(self, result):
         self.status_label.setText("상태: ✅ AI 생성 완료!")
         for field_name, output_widget in self.output_fields.items():
@@ -193,6 +199,7 @@ class MainWindow(QWidget):
         self.cancel_button.setEnabled(False)
         self.current_task_id = None
 
+    # API 요청 중 발생한 모든 에러 처리
     def handle_error(self, error_message):
         self.status_label.setText(f"상태: ❌ 오류 발생")
         QMessageBox.critical(self, "오류", str(error_message))
@@ -200,16 +207,19 @@ class MainWindow(QWidget):
         self.cancel_button.setEnabled(False)
         self.current_task_id = None
 
+    # 새로운 요청 전 기존 결과창의 내용을 모두 지움
     def clear_outputs(self):
         for output_widget in self.output_fields.values():
             self.set_widget_text(output_widget, "")
 
+    # 위젯 종류에 따라 텍스트를 설정
     def set_widget_text(self, widget, text):
         if isinstance(widget, QLineEdit):
             widget.setText(text)
         elif isinstance(widget, QTextEdit):
             widget.setText(text)
 
+    # '복사' 버튼 클릭 시 해당 라인 텍스트를 클립보드에 복사
     def copy_to_clipboard(self, text_widget):
         text = text_widget.text() if isinstance(text_widget, QLineEdit) else text_widget.toPlainText()
         if text:

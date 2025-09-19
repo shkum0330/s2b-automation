@@ -34,6 +34,7 @@ public class ApiController {
 
     @PostMapping("/generate-spec")
     public ResponseEntity<?> generateSpecification(@RequestBody GenerateRequest request) {
+        log.info(request.getModel());
         // 1. GenerationService가 직접 CompletableFuture를 반환
         CompletableFuture<GenerateResponse> future = generationService.generateSpec(
                 request.getModel(),
