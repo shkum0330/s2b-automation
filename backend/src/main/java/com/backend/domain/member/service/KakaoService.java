@@ -58,9 +58,9 @@ public class KakaoService {
 
     @Transactional
     public LoginResponseDto kakaoLogin(String code, HttpServletResponse response) throws IOException {
-        log.debug("kakao redirect uri : " + kakaoRedirectUri);
+        log.info("kakao redirect uri : " + kakaoRedirectUri);
         // 1. 카카오 액세스 토큰 가져오기
-        String kakaoAccessToken = getToken(code);
+        String kakaoAccessToken = getToken(code, "http://localhost:8989");
 
         // 2. 카카오 사용자 정보 가져오기
         KakaoUserInfoDto kakaoUserInfo = getKakaoUserInfo(kakaoAccessToken);
@@ -90,9 +90,8 @@ public class KakaoService {
                 .build();
     }
 
-    private String getToken(String code) throws JsonProcessingException {
+    private String getToken(String code, String redirectUri) throws JsonProcessingException {
         try {
-            // 요청 URL 만들기
             URI uri = UriComponentsBuilder
                     .fromUriString("https://kauth.kakao.com")
                     .path("/oauth/token")
@@ -100,15 +99,14 @@ public class KakaoService {
                     .build()
                     .toUri();
 
-            // HTTP Header 생성
             HttpHeaders headers = new HttpHeaders();
             headers.add("Content-type", "application/x-www-form-urlencoded;charset=utf-8");
 
-            // HTTP Body 생성
             MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
             body.add("grant_type", "authorization_code");
             body.add("client_id", kakaoClientId);
-            body.add("redirect_uri", kakaoRedirectUri);
+            // application.yml에 설정된 값이 아닌, 파라미터로 받은 redirectUri를 사용
+            body.add("redirect_uri", redirectUri);
             body.add("code", code);
             body.add("client_secret", kakaoClientSecret);
 
@@ -117,17 +115,16 @@ public class KakaoService {
                     .headers(headers)
                     .body(body);
 
-            // HTTP 요청 보내기
             ResponseEntity<String> response = restTemplate.exchange(
                     requestEntity,
                     String.class
             );
 
-            // HTTP 응답 (JSON) -> 액세스 토큰 파싱
             JsonNode jsonNode = new ObjectMapper().readTree(response.getBody());
             return jsonNode.get("access_token").asText();
         } catch (RestClientException e) {
-            e.printStackTrace();
+            // 에러 로깅 개선
+            log.error("카카오 토큰 발급 요청 실패", e);
             throw AuthenticationException.socialLoginError();
         }
     }
@@ -169,7 +166,7 @@ public class KakaoService {
             log.info("카카오 사용자 정보: " + id + ", " + nickname + ", " + email);
             return new KakaoUserInfoDto(id, nickname, email, profileImageUrl);
         } catch (RestClientException e) {
-            e.printStackTrace();
+            log.error("유저 데이터 가져오기 실패");
             throw AuthenticationException.fetchUserdataError();
         }
     }
