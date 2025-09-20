@@ -1,6 +1,5 @@
 package com.backend.global.config;
 
-import com.backend.global.auth.filter.AnonymousAuthenticationFilter;
 import com.backend.global.auth.filter.JwtAuthenticationFilter;
 import com.backend.global.auth.jwt.JwtProvider;
 import com.backend.global.auth.service.MemberDetailsService;
@@ -18,9 +17,6 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
-import org.springframework.security.web.util.matcher.OrRequestMatcher;
-import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -83,7 +79,7 @@ public class SecurityConfig {
                                 "/favicon.ico",
                                 "/api/v1/auth/callback/kakao",
                                 "/api/v1/auth/token",
-                                "/actuator/*",
+                                "/actuator/health",
                                 "/ping",
                                 "/error"
                         ).permitAll()
@@ -99,9 +95,7 @@ public class SecurityConfig {
 
         // 3. 커스텀 필터 추가
         http
-                .addFilterBefore(new JwtAuthenticationFilter(jwtProvider, memberDetailsService), UsernamePasswordAuthenticationFilter.class)
-                .addFilterBefore(new AnonymousAuthenticationFilter(), JwtAuthenticationFilter.class);
-
+                .addFilterBefore(new JwtAuthenticationFilter(jwtProvider, memberDetailsService), UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
 }

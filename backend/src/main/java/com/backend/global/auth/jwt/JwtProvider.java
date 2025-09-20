@@ -124,8 +124,10 @@ public class JwtProvider {
 
         cookie.setPath("/");
         cookie.setHttpOnly(true);
-        cookie.setSecure(true);
-        cookie.setAttribute("SameSite", "None");
+        cookie.setSecure(true); // 'localhost'가 아닌 HTTPS 환경에서 테스트 시 필요
+
+        // SameSite 정책을 Lax로 변경하여 CSRF 방어 강화
+        cookie.setAttribute("SameSite", "Lax");
 
         int maxAgeInSeconds = 3600; // 1시간
         cookie.setMaxAge(7 * 24 * maxAgeInSeconds);

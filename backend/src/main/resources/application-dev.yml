@@ -8,9 +8,9 @@ logging:
       springframework:
         jdbc: debug
         security: info
-      com.zaxxer.hikari: debug
+    com.zaxxer.hikari: debug
 
 kakao:
-  client-id: ${KAKA0_CLIENT_ID}
+  client-id: ${KAKAO_CLIENT_ID}
   redirect-uri: ${KAKAO_REDIRECT_URI}
   client-secret: ${KAKAO_CLIENT_SECRET}

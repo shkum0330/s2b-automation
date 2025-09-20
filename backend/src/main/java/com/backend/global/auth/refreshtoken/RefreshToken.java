@@ -6,6 +6,9 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.time.Duration;
+import java.time.Instant;
+
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Entity
@@ -15,16 +18,16 @@ public class RefreshToken {
 
     private String refreshToken;
 
-    private long expiration;
+    private Instant expiresAt;
 
     public RefreshToken(String keyEmail, String refreshToken) {
         this.keyEmail = keyEmail;
         this.refreshToken = refreshToken;
-        this.expiration = 604800L; // 7일
+        this.expiresAt = Instant.now().plus(Duration.ofDays(7));
     }
 
     public void updateToken(String newRefreshToken) {
         this.refreshToken = newRefreshToken;
-        this.expiration = 604800L; // 만료 시간 초기화
+        this.expiresAt = Instant.now().plus(Duration.ofDays(7));
     }
 }

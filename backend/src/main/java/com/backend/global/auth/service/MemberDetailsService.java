@@ -19,6 +19,5 @@ public class MemberDetailsService implements UserDetailsService {
         Member member = memberRepository.findByEmail(email)
                 .orElseThrow(() -> NotFoundException.entityNotFound("Member"));
         return new MemberDetails(member);
-
     }
 }
