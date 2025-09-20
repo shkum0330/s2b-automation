@@ -1,11 +1,11 @@
 package com.backend.controller;
 
-import com.backend.generation.dto.CertificationResponse;
-import com.backend.generation.dto.GenerateRequest;
-import com.backend.generation.dto.GenerateResponse;
-import com.backend.generation.controller.ApiController;
-import com.backend.generation.service.GenerationService;
-import com.backend.generation.service.TaskService;
+import com.backend.domain.generation.dto.CertificationResponse;
+import com.backend.domain.generation.dto.GenerateRequest;
+import com.backend.domain.generation.dto.GenerateResponse;
+import com.backend.domain.generation.controller.ApiController;
+import com.backend.domain.generation.service.GenerationService;
+import com.backend.domain.generation.service.TaskService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

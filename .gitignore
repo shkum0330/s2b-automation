@@ -36,5 +36,19 @@ out/
 ### VS Code ###
 .vscode/
 
-application-dev.yml
+
+# macOS system files
+.DS_Store
+
+# IntelliJ IDEA files
+.idea/
+
+# Build output & generated files
+/backend/build/
+/backend/src/main/resources/static/docs/
+
+# NPM dependency folders (if frontend uses npm)
+/frontend/node_modules/
+
 env.yml
+

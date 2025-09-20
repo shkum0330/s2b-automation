@@ -29,16 +29,42 @@ def snippetsDir = file("build/generated-snippets")
 
 dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-web'
+
+    // jpa
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
-    compileOnly 'org.projectlombok:lombok'
-    annotationProcessor 'org.projectlombok:lombok'
+
+    // scraping
     implementation 'org.jsoup:jsoup:1.17.2'
+
+    // monitoring
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'io.micrometer:micrometer-registry-prometheus'
+
+    // cache
     implementation 'com.github.ben-manes.caffeine:caffeine:3.1.8'
+
+    // webclient
     implementation 'org.springframework.boot:spring-boot-starter-webflux'
+
+    // retry
     implementation 'org.springframework.retry:spring-retry'
+
+    // aop
     implementation 'org.springframework.boot:spring-boot-starter-aop'
+
+    // spring security
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+
+    // jwt
+    compileOnly group: 'io.jsonwebtoken', name: 'jjwt-api', version: '0.11.5'
+    runtimeOnly group: 'io.jsonwebtoken', name: 'jjwt-impl', version: '0.11.5'
+    runtimeOnly group: 'io.jsonwebtoken', name: 'jjwt-jackson', version: '0.11.5'
+
+    // lombok
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     runtimeOnly 'com.mysql:mysql-connector-j'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
