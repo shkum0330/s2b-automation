@@ -84,4 +84,8 @@ public class MemberService {
         memberRepository.save(member);
     }
 
+    @Transactional
+    public void decrementCredit(Member member) {
+        member.decrementRequestCount();
+    }
 }

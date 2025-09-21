@@ -37,6 +37,7 @@ public class Member extends BaseTimeEntity {
     @Column(length = 50, unique = true)
     private String providerId;
 
+    @Setter
     @Column(nullable = false)
     private int credit = 0;
 
