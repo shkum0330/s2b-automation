@@ -1,6 +1,7 @@
 package com.backend.domain.member.service;
 
 import com.backend.domain.member.dto.MemberInfoDto;
+import com.backend.domain.member.dto.MemberResponseDto;
 import com.backend.domain.member.entity.Member;
 import com.backend.domain.member.repository.MemberRepository;
 import com.backend.global.auth.entity.MemberDetails;
@@ -87,5 +88,10 @@ public class MemberService {
     @Transactional
     public void decrementCredit(Member member) {
         member.decrementRequestCount();
+    }
+
+    @Transactional(readOnly = true)
+    public MemberResponseDto getMemberInfo(Member member) {
+        return new MemberResponseDto(member);
     }
 }

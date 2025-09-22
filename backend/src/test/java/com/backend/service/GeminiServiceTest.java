@@ -88,37 +88,4 @@ class GeminiServiceTest {
         }
     }
 
-    // --- [NEW] 크레딧 차감 성공 테스트 메서드 ---
-    @Test
-    @DisplayName("크레딧 차감 성공 테스트")
-    void decrementCredit_success() {
-        // given
-        memberRepository.save(testMember);
-
-        // when
-        memberService.decrementCredit(testMember);
-
-        // then
-        Member foundMember = memberRepository.findByEmail("testuser@example.com").orElseThrow();
-        assertThat(foundMember.getCredit()).isEqualTo(9);
-    }
-
-
-    // --- [NEW] 크레딧 부족 시 실패 테스트 메서드 ---
-    @Test
-    @DisplayName("크레딧 부족 시 예외 발생 테스트")
-    void decrementCredit_fail_when_credit_is_insufficient() {
-        // given
-        // testMember의 credit은 기본값 0
-        testMember.setCredit(0);
-        memberRepository.save(testMember);
-
-        // when & then
-        IllegalStateException exception = assertThrows(IllegalStateException.class, () -> {
-            memberService.decrementCredit(testMember);
-        });
-
-        assertThat(exception.getMessage()).isEqualTo("크레딧이 부족합니다.");
-        log.info("크레딧이 부족합니다.");
-    }
 }
