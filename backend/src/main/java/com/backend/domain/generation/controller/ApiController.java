@@ -37,20 +37,13 @@ public class ApiController {
     @PostMapping("/generate-spec")
     public ResponseEntity<?> generateSpecification(@RequestBody GenerateRequest request,
                                                    @AuthenticationPrincipal MemberDetails memberDetails) {
-        log.info(request.getModel());
-        try {
-            memberService.decrementCredit(memberDetails.member());
-        } catch (IllegalStateException e) {
-            // 크레딧 부족 또는 일일 요청 횟수 초과 시 에러 응답
-            log.warn("사용자(email: {})의 크레딧이 부족합니다. 메시지: {}", memberDetails.getUsername(), e.getMessage());
-            return ResponseEntity.status(HttpStatus.PAYMENT_REQUIRED).body(Map.of("error", e.getMessage()));
-        }
 
         // 1. GenerationService가 직접 CompletableFuture를 반환
         CompletableFuture<GenerateResponse> future = generationService.generateSpec(
                 request.getModel(),
                 request.getSpecExample(),
-                request.getProductNameExample()
+                request.getProductNameExample(),
+                memberDetails.member() // 사용자 정보 전달
         );
 
         // 2. 생성된 Future를 TaskService에 등록하고 taskId를 받음

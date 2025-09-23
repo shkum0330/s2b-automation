@@ -86,8 +86,14 @@ public class MemberService {
     }
 
     @Transactional
-    public void decrementCredit(Member member) {
+    public void decrementCredit(Long memberId) {
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new IllegalArgumentException("ID에 해당하는 멤버를 찾을 수 없습니다: " + memberId));
+
+        // 영속 상태의 엔티티를 수정하면 더티 체킹으로 인해 트랜잭션 종료 시 자동으로 DB에 반영됨
+        log.info("요청 전 크레딧: {}",member.getCredit());
         member.decrementRequestCount();
+        log.info("요청 후 크레딧: {}",member.getCredit());
     }
 
     @Transactional(readOnly = true)

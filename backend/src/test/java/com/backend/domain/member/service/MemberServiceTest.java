@@ -17,7 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @SpringBootTest
 @Transactional
-@ActiveProfiles("dev") // 'dev' 프로필로 테스트 실행
+@ActiveProfiles("dev")
 class MemberServiceTest {
 
     @Autowired

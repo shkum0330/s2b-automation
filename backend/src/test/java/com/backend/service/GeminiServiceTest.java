@@ -64,7 +64,7 @@ class GeminiServiceTest {
 
         log.info("\n--- 2. 서비스 메소드 실행 ---");
         try {
-            CompletableFuture<GenerateResponse> future = geminiService.generateSpec(model, specExample, productNameExample);
+            CompletableFuture<GenerateResponse> future = geminiService.generateSpec(model, specExample, productNameExample, testMember);
 
             log.info("AI와 스크래핑 작업이 완료될 때까지 대기합니다...");
             GenerateResponse response = future.get();

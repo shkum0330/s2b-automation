@@ -57,21 +57,9 @@ public class Member extends BaseTimeEntity {
 
     // 잔여 횟수 차감 비즈니스 로직
     public void decrementRequestCount() {
-        if (this.role == Role.PAID_USER) {
-            if (this.credit <= 0) {
-                throw new IllegalStateException("크레딧이 부족합니다.");
-            }
-            this.credit--;
-        } else {
-            if (this.lastRequestDate == null || !this.lastRequestDate.isEqual(LocalDate.now())) {
-                this.dailyRequestCount = 0;
-            }
-
-            if (this.dailyRequestCount >= 2) {
-                throw new IllegalStateException("일일 요청 횟수를 초과했습니다.");
-            }
-            this.dailyRequestCount++;
-            this.lastRequestDate = LocalDate.now();
+        if (this.credit <= 0) {
+            throw new IllegalStateException("크레딧이 부족합니다.");
         }
+        this.credit--;
     }
 }
