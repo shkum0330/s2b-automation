@@ -15,6 +15,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -85,14 +86,17 @@ public class MemberService {
         memberRepository.save(member);
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void decrementCredit(Long memberId) {
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new IllegalArgumentException("ID에 해당하는 멤버를 찾을 수 없습니다: " + memberId));
 
         // 영속 상태의 엔티티를 수정하면 더티 체킹으로 인해 트랜잭션 종료 시 자동으로 DB에 반영됨
         log.info("요청 전 크레딧: {}",member.getCredit());
-        member.decrementRequestCount();
+        int updated = memberRepository.decrementCreditIfPossible(memberId);
+        if (updated == 0) {
+            throw new IllegalStateException("크레딧이 부족합니다.");
+        }
         log.info("요청 후 크레딧: {}",member.getCredit());
     }
 
