@@ -2,6 +2,8 @@ package com.backend.domain.generation.service.impl;
 
 import com.backend.domain.generation.dto.CertificationResponse;
 import com.backend.domain.generation.dto.GenerateResponse;
+import com.backend.domain.member.entity.Member;
+import com.backend.domain.member.service.MemberService;
 import com.backend.global.exception.GenerateApiException;
 import com.backend.domain.generation.service.GenerationService;
 import com.backend.global.util.PromptBuilder;
@@ -25,6 +27,7 @@ import java.util.concurrent.CompletionException;
 @RequiredArgsConstructor
 @Slf4j(topic = "GenerationService")
 public abstract class AbstractGenerationService implements GenerationService {
+    private final MemberService memberService;
     private final ScrapingService scrapingService;
     private final PromptBuilder promptBuilder;
     private final ObjectMapper objectMapper;
@@ -32,7 +35,7 @@ public abstract class AbstractGenerationService implements GenerationService {
     private final Executor taskExecutor;
 
     @Override
-    public CompletableFuture<GenerateResponse> generateSpec(String model, String specExample, String productNameExample) {
+    public CompletableFuture<GenerateResponse> generateSpec(String model, String specExample, String productNameExample, Member member) {
 
         // 스크래핑 작업은 별도의 스레드에서 실행
         CompletableFuture<Optional<String>> g2bFuture = CompletableFuture.supplyAsync(
@@ -44,7 +47,7 @@ public abstract class AbstractGenerationService implements GenerationService {
         CompletableFuture<GenerateResponse> mainSpecFuture = this.fetchMainSpec(model, specExample, productNameExample);
 
         // thenCombineAsync를 사용하여 논블로킹 방식으로 비동기 결과들을 조합
-        return mainSpecFuture
+        CompletableFuture<GenerateResponse> combinedFuture =  mainSpecFuture
                 .thenCombineAsync(certFuture, (mainSpec, cert) -> {
                     mainSpec.setCertificationNumber(cert);
                     return mainSpec;
@@ -57,6 +60,24 @@ public abstract class AbstractGenerationService implements GenerationService {
                     countryOpt.ifPresent(mainSpec::setCountryOfOrigin); // Scraping 결과가 있으면 Gemini에서 받아온 결과를 덮어씀
                     return mainSpec;
                 }, taskExecutor);
+
+        combinedFuture.whenCompleteAsync((result, throwable) -> {
+            // throwable이 null이면 모든 작업이 예외 없이 성공했다는 의미
+            if (throwable == null) {
+                try {
+                    memberService.decrementCredit(member.getId());
+                    log.info("사용자(email: {})의 크레딧이 성공적으로 차감되었습니다.", member.getEmail());
+                } catch (Exception e) {
+                    log.error("비동기 작업 성공 후 크레딧 차감 중 에러 발생. 사용자 Email: {}", member.getEmail(), e);
+                    // 여기에 추가적인 에러 처리 로직을 넣을 수 있습니다 (예: 운영자에게 알림)
+                }
+            } else {
+                // 비동기 작업 중 하나라도 실패하면 로그만 남기고 크레딧은 차감하지 않음
+                log.warn("비동기 작업 실패로 인해 사용자(email: {})의 크레딧을 차감하지 않았습니다. 원인: {}", member.getEmail(), throwable.getMessage());
+            }
+        }, taskExecutor);
+
+        return combinedFuture; // 원래의 Future를 그대로 반환
     }
 
     @Retryable(

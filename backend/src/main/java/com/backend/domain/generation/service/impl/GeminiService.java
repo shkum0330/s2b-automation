@@ -1,5 +1,6 @@
 package com.backend.domain.generation.service.impl;
 
+import com.backend.domain.member.service.MemberService;
 import com.backend.global.util.PromptBuilder;
 import com.backend.domain.generation.service.ScrapingService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -24,8 +25,8 @@ public class GeminiService extends AbstractGenerationService {
     @Value("${gemini.api.key}")
     private String apiKey;
 
-    public GeminiService(ScrapingService scrapingService, PromptBuilder promptBuilder, ObjectMapper objectMapper, WebClient webClient, Executor taskExecutor) {
-        super(scrapingService, promptBuilder, objectMapper, webClient, taskExecutor);
+    public GeminiService(ScrapingService scrapingService, PromptBuilder promptBuilder, ObjectMapper objectMapper, WebClient webClient, Executor taskExecutor, MemberService memberService) {
+        super(memberService, scrapingService, promptBuilder, objectMapper, webClient, taskExecutor);
     }
 
     @Override

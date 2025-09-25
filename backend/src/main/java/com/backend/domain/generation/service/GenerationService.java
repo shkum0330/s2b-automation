@@ -1,6 +1,7 @@
 package com.backend.domain.generation.service;
 
 import com.backend.domain.generation.dto.GenerateResponse;
+import com.backend.domain.member.entity.Member;
 import com.backend.global.exception.GenerateApiException;
 
 import java.util.concurrent.CompletableFuture;
@@ -15,7 +16,7 @@ public interface GenerationService {
      * @return 생성된 제품 정보가 담긴 GenerateResponse 객체
      * @throws GenerateApiException API 호출 또는 데이터 처리 중 발생할 수 있는 예외
      */
-    CompletableFuture<GenerateResponse> generateSpec(String model, String specExample, String productNameExample) throws GenerateApiException;
+    CompletableFuture<GenerateResponse> generateSpec(String model, String specExample, String productNameExample, Member member) throws GenerateApiException;
 
 //    /**
 //     * 전자제품 모델명으로 인증 정보를 생성

@@ -1,16 +1,12 @@
-# main_window.py
-
 import pyperclip
 from PyQt5.QtWidgets import (QWidget, QLabel, QLineEdit, QTextEdit,
                              QPushButton, QVBoxLayout, QGroupBox, QGridLayout,
-                             QMessageBox, QHBoxLayout)
+                             QMessageBox, QHBoxLayout, QSpacerItem, QSizePolicy)
 from PyQt5.QtCore import Qt, QTimer
 from api_worker import ApiWorker
 
 
-# 로그인 후의 메인 UI를 담당하는 윈도우
 class MainWindow(QWidget):
-    # 메인 윈도우 초기화, MainController로부터 Access Token 전달 받음
     def __init__(self, access_token=None):
         super().__init__()
         self.access_token = access_token
@@ -21,9 +17,19 @@ class MainWindow(QWidget):
         self.output_fields = {}
         self.copy_buttons = {}
         self.initUI()
+        self.update_credit_display()
 
-    # 메인 윈도우의 모든 UI 요소 설정
     def initUI(self):
+        self.credit_label = QLabel("남은 크레딧: -")
+        self.refresh_button = QPushButton("새로고침")
+        self.refresh_button.setFixedWidth(80)
+        self.refresh_button.clicked.connect(self.update_credit_display)
+
+        credit_layout = QHBoxLayout()
+        credit_layout.addStretch(1)
+        credit_layout.addWidget(self.credit_label)
+        credit_layout.addWidget(self.refresh_button)
+
         request_group = QGroupBox("서버에 보낼 정보")
         product_name_example_label = QLabel("1. 물품(용역)명:")
         self.product_name_example_input = QLineEdit()
@@ -86,16 +92,43 @@ class MainWindow(QWidget):
         response_group.setLayout(res_layout)
 
         main_layout = QVBoxLayout(self)
+        main_layout.addLayout(credit_layout)
         main_layout.addWidget(request_group)
         main_layout.addWidget(action_group)
         main_layout.addWidget(response_group)
-
         self.run_button.clicked.connect(self.start_api_call)
         self.cancel_button.clicked.connect(self.cancel_api_call)
         self.setWindowTitle("S2B 상품 정보 AI 생성기")
         self.setGeometry(300, 300, 700, 800)
 
-    # 'AI로 결과 생성하기' 버튼 클릭 시 호출
+    def update_credit_display(self):
+        self.credit_label.setText("...새로고침 중...")
+        url = "http://localhost:8080/api/v1/members/me"
+        headers = {"Authorization": self.access_token}
+        self.credit_worker = ApiWorker('GET', url, headers=headers)
+        self.credit_worker.finished.connect(self.handle_credit_response)
+        self.credit_worker.start()
+
+    def handle_credit_response(self, result):
+        # --- [MODIFIED] ---
+        # 사용자 역할(role)에 관계없이 모든 사용자에게 남은 크레딧을 표시
+        if result.get('ok'):
+            json_body = result.get('json', {})
+            credit = json_body.get('credit', 'N/A')
+            self.credit_label.setText(f"남은 크레딧: {credit}")
+        else:
+            self.credit_label.setText("크레딧 조회 실패")
+        # ------------------
+
+    def handle_api_result(self, result):
+        self.status_label.setText("상태: ✅ AI 생성 완료!")
+        for field_name, output_widget in self.output_fields.items():
+            self.set_widget_text(output_widget, str(result.get(field_name, '')))
+        self.run_button.setEnabled(True)
+        self.cancel_button.setEnabled(False)
+        self.current_task_id = None
+        self.update_credit_display()
+
     def start_api_call(self):
         model = self.model_input.text()
         spec_example = self.spec_example_input.toPlainText()
@@ -122,9 +155,9 @@ class MainWindow(QWidget):
         self.worker.finished.connect(self.handle_task_start_response)
         self.worker.start()
 
-    # '/generate-spec' API의 초기 응답 처리
     def handle_task_start_response(self, result):
         if not result.get('ok'):
+            self.update_credit_display()
             self.handle_error(result.get('json', {}).get('message', result.get('error', '알 수 없는 오류')))
             return
 
@@ -138,7 +171,6 @@ class MainWindow(QWidget):
         else:
             self.handle_error(json_body.get("error") or json_body.get("message", "알 수 없는 응답"))
 
-    # 3초마다 AI 작업의 현재 상태를 서버에 확인(폴링)
     def check_task_status(self):
         if not self.current_task_id:
             return
@@ -149,7 +181,6 @@ class MainWindow(QWidget):
         self.worker.finished.connect(self.handle_polling_response)
         self.worker.start()
 
-    # 폴링 요청의 응답 처리
     def handle_polling_response(self, result):
         if not result.get('ok'):
             self.polling_timer.stop()
@@ -167,7 +198,6 @@ class MainWindow(QWidget):
         else:
             self.status_label.setText(f"상태: ⏳ 작업 진행 중...")
 
-    # '취소' 버튼 클릭 시 호출
     def cancel_api_call(self):
         if not self.current_task_id:
             return
@@ -180,7 +210,6 @@ class MainWindow(QWidget):
         self.worker.finished.connect(self.handle_cancel_response)
         self.worker.start()
 
-    # 취소 요청의 응답 처리
     def handle_cancel_response(self, result):
         if result.get('ok') and result.get('json', {}).get("success"):
             self.status_label.setText("상태: ❌ 작업이 성공적으로 취소되었습니다.")
@@ -190,16 +219,6 @@ class MainWindow(QWidget):
         self.cancel_button.setEnabled(False)
         self.current_task_id = None
 
-    # 최종 API 결과를 UI 결과창에 채워 넣음
-    def handle_api_result(self, result):
-        self.status_label.setText("상태: ✅ AI 생성 완료!")
-        for field_name, output_widget in self.output_fields.items():
-            self.set_widget_text(output_widget, str(result.get(field_name, '')))
-        self.run_button.setEnabled(True)
-        self.cancel_button.setEnabled(False)
-        self.current_task_id = None
-
-    # API 요청 중 발생한 모든 에러 처리
     def handle_error(self, error_message):
         self.status_label.setText(f"상태: ❌ 오류 발생")
         QMessageBox.critical(self, "오류", str(error_message))
@@ -207,19 +226,16 @@ class MainWindow(QWidget):
         self.cancel_button.setEnabled(False)
         self.current_task_id = None
 
-    # 새로운 요청 전 기존 결과창의 내용을 모두 지움
     def clear_outputs(self):
         for output_widget in self.output_fields.values():
             self.set_widget_text(output_widget, "")
 
-    # 위젯 종류에 따라 텍스트를 설정
     def set_widget_text(self, widget, text):
         if isinstance(widget, QLineEdit):
             widget.setText(text)
         elif isinstance(widget, QTextEdit):
             widget.setText(text)
 
-    # '복사' 버튼 클릭 시 해당 라인 텍스트를 클립보드에 복사
     def copy_to_clipboard(self, text_widget):
         text = text_widget.text() if isinstance(text_widget, QLineEdit) else text_widget.toPlainText()
         if text:
