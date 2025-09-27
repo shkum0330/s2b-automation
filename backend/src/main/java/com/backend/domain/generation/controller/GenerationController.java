@@ -1,5 +1,7 @@
 package com.backend.domain.generation.controller;
 
+import com.backend.domain.generation.dto.GenerateGeneralRequest;
+import com.backend.domain.generation.dto.GenerateGeneralResponse;
 import com.backend.domain.generation.dto.GenerateRequest;
 import com.backend.domain.generation.dto.GenerateResponse;
 import com.backend.domain.generation.async.TaskResult;
@@ -71,6 +73,31 @@ public class GenerationController {
             Thread.currentThread().interrupt();
 //            log.error("Task {} 처리 중 스레드가 중단되었습니다.", taskId, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "Request processing was interrupted."));
+        }
+    }
+
+    // --- [NEW] 비전자제품용 API 엔드포인트 추가 ---
+    @PostMapping("/generate-general-spec")
+    public ResponseEntity<?> generateGeneralSpecification(
+            @RequestBody GenerateGeneralRequest request,
+            @AuthenticationPrincipal MemberDetails memberDetails) {
+
+        // 비동기 서비스 호출
+        CompletableFuture<GenerateGeneralResponse> future = generationService.generateGeneralSpec(
+                request.getProductName(),
+                request.getSpecExample(),
+                memberDetails.member()
+        );
+
+        // 비전자제품 API는 상대적으로 빠를 것으로 예상되므로, 여기서는 Polling 방식 없이 동기 대기만으로 처리함
+        try {
+            GenerateGeneralResponse response = future.get(RESPONSE_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("비전자제품 생성 중 예외 발생", e);
+            // 에러 원인에 따라 더 상세한 처리가 가능합니다.
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "AI 생성 중 오류가 발생했습니다: " + e.getMessage()));
         }
     }
 

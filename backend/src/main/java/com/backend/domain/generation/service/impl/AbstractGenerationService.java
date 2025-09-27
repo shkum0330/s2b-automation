@@ -1,6 +1,7 @@
 package com.backend.domain.generation.service.impl;
 
 import com.backend.domain.generation.dto.CertificationResponse;
+import com.backend.domain.generation.dto.GenerateGeneralResponse;
 import com.backend.domain.generation.dto.GenerateResponse;
 import com.backend.domain.member.entity.Member;
 import com.backend.domain.member.service.MemberService;
@@ -78,6 +79,40 @@ public abstract class AbstractGenerationService implements GenerationService {
         }, taskExecutor);
 
         return combinedFuture; // 원래의 Future를 그대로 반환
+    }
+
+    @Override
+    public CompletableFuture<GenerateGeneralResponse> generateGeneralSpec(String productName, String specExample, Member member) throws GenerateApiException {
+        // 비전자제품용 프롬프트 생성
+        String prompt = promptBuilder.buildGeneralProductSpecPrompt(productName, specExample);
+        HttpEntity<Map<String, Object>> requestEntity = createRequestEntity(prompt);
+        String apiUrl = getApiUrl();
+
+        // AI API 호출
+        CompletableFuture<GenerateGeneralResponse> future = webClient.post()
+                .uri(apiUrl)
+                .headers(headers -> headers.addAll(requestEntity.getHeaders()))
+                .bodyValue(requestEntity.getBody())
+                .retrieve()
+                .bodyToMono(String.class)
+                .map(jsonResponse -> parseResponse(jsonResponse, GenerateGeneralResponse.class)) // GenerateGeneralResponse로 파싱
+                .toFuture();
+
+        // 비동기 작업 완료 시 크레딧 차감
+        future.whenCompleteAsync((result, throwable) -> {
+            if (throwable == null) {
+                try {
+                    memberService.decrementCredit(member.getId());
+                    log.info("비전자제품 생성 성공. 사용자(ID: {}) 크레딧 차감.", member.getId());
+                } catch (Exception e) {
+                    log.error("비전자제품 생성 성공 후 크레딧 차감 중 에러 발생. 사용자 ID: {}", member.getId(), e);
+                }
+            } else {
+                log.warn("비전자제품 생성 실패로 사용자(ID: {}) 크레딧을 차감하지 않았습니다. 원인: {}", member.getId(), throwable.getMessage());
+            }
+        }, taskExecutor);
+
+        return future;
     }
 
     @Retryable(

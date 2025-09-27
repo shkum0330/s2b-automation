@@ -47,6 +47,43 @@ public class PromptBuilder {
         {"productName":"생성된 물품명","specification":"생성된 규격","modelName":"%s","manufacturer":"찾아낸 제조사","countryOfOrigin":"찾아낸 원산지"}
         """;
 
+    private static final String GENERAL_PRODUCT_SPEC_PROMPT_TEMPLATE = """
+        당신은 일반 제품(비전자제품) 정보를 정확하게 조사하는 데이터 전문가입니다.
+        아래 원칙을 반드시 지키고, 확증되지 않은 정보는 공백으로 처리하세요.
+
+        [허용 출처]
+        1) 제조사 공식 한국어 웹사이트 2) 다나와(danawa.com) 3) 네이버 플러스 스토어(shopping.naver.com)
+
+        [정보 탐색 규칙]
+        - 입력된 '실제 제품명'을 핵심 키워드로 사용하여 정확히 일치하는 제품을 찾습니다.
+        - '규격 형식 예시'는 참고하여 제품의 세부 정보를 파악하는 데 활용합니다.
+
+        [제조사·원산지 규칙]
+        - 제조사는 공식 표기를 최우선으로 사용하고, 불명확하면 빈 문자열("")로 처리합니다.
+        - 원산지는 제품 정보에 명시된 국가를 사용합니다. 명확하지 않을 경우, 제조사의 본사 주소(국가 또는 도시)를 대신 기입합니다.
+
+        [규격 생성 규칙]
+        - '규격 형식 예시'에 중괄호 `{}`가 포함된 경우(예: `용량: {용량}`), 이는 '엄격한 템플릿'입니다.
+        - 템플릿의 `{}` 안의 항목에 해당하는 실제 정보를 찾아 정확히 교체하여 최종 'specification' 값을 완성해야 합니다.
+        - 특정 항목의 정보를 찾지 못하면, 해당 `{}` 부분만 빈 문자열("")로 대체합니다.
+        - 중괄호가 없으면, 제품의 핵심 스펙을 50자 이내로 요약하여 생성합니다.
+
+        [출력 규칙]
+        - productName은 입력된 '실제 제품명'과 동일해야 합니다.
+        - 반드시 아래 JSON 형식만 출력하고, 부가적인 설명은 절대 금지합니다.
+
+        실제 제품명: '%s'
+        규격 형식 예시: '%s'
+
+        작업 지시:
+        1) 정보 조사: '실제 제품명'과 '규격 형식 예시'를 조합하여 제품 정보를 조사.
+        2) 정보 생성: '제조사'와 '원산지'를 규칙에 따라 생성.
+        3) 규격 생성: '[규격 생성 규칙]'을 엄격히 준수하여 'specification' 값을 생성.
+        4) 최종 출력: 아래 JSON만 반환.
+
+        {"productName":"%s","specification":"생성된 규격","manufacturer":"찾아낸 제조사","countryOfOrigin":"찾아낸 원산지"}
+        """;
+
     // 인증번호 조회용 프롬프트
     private static final String CERTIFICATION_PROMPT_TEMPLATE = """
         %s 모델의 "국가기술표준원 인증번호"와 "KC 전파적합성인증번호"를 찾아오세요.
@@ -88,6 +125,15 @@ public class PromptBuilder {
                 productNameInstruction,
                 model,
                 model
+        );
+    }
+
+    public String buildGeneralProductSpecPrompt(String productName, String specExample) {
+        return String.format(
+                GENERAL_PRODUCT_SPEC_PROMPT_TEMPLATE,
+                productName,
+                specExample,
+                productName
         );
     }
 

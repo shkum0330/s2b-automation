@@ -51,8 +51,8 @@ class GeminiServiceTest {
 
 
     @Test
-    @DisplayName("서비스 입출력 로깅 테스트")
-    void ioTest() {
+    @DisplayName("전자제품 서비스 입출력 로깅 테스트")
+    void electronicsIoTest() {
 
         log.info("--- 1. 테스트 입력값 설정 ---");
         String model = "AX033B310GBD";
@@ -85,6 +85,41 @@ class GeminiServiceTest {
 
         } catch (Exception e) {
             log.error("테스트 실행 중 예외 발생", e);
+        }
+    }
+
+    @Test
+    @DisplayName("비전자제품 서비스 입출력 로깅 테스트")
+    void generalIoTest() {
+        // given
+        log.info("--- 1. 비전자제품 테스트 입력값 설정 ---");
+        String productName = "앙블랑 세이프 버건디 물티슈 캡형";
+        String specExample = "{용량} / 엠보싱타입 / 평량 80gsm";
+        log.info("Product Name: {}", productName);
+        log.info("Spec Example: {}", specExample);
+
+        // when
+        log.info("\n--- 2. 비전자제품 서비스 메소드 실행 ---");
+        try {
+            // geminiService의 새로운 메서드 호출
+            CompletableFuture<com.backend.domain.generation.dto.GenerateGeneralResponse> future = geminiService.generateGeneralSpec(productName, specExample, testMember);
+
+            log.info("AI 작업이 완료될 때까지 대기합니다...");
+            com.backend.domain.generation.dto.GenerateGeneralResponse response = future.get(); // 비동기 작업 완료까지 대기
+
+            // then
+            log.info("\n--- 3. 받아온 모든 특성들 로그 출력 (줄 단위 구분) ---");
+            if (response != null) {
+                log.info("productName: {}", response.getProductName());
+                log.info("specification: {}", response.getSpecification());
+                log.info("manufacturer: {}", response.getManufacturer());
+                log.info("countryOfOrigin: {}", response.getCountryOfOrigin());
+            } else {
+                log.warn("응답 객체가 null입니다.");
+            }
+
+        } catch (Exception e) {
+            log.error("비전자제품 테스트 실행 중 예외 발생", e);
         }
     }
 
