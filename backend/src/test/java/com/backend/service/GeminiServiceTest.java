@@ -122,5 +122,4 @@ class GeminiServiceTest {
             log.error("비전자제품 테스트 실행 중 예외 발생", e);
         }
     }
-
 }

@@ -36,44 +36,23 @@ public class GenerationController {
     private static final long RESPONSE_TIMEOUT_SECONDS = 60;
 
     @PostMapping("/generate-spec")
-    public ResponseEntity<?> generateSpecification(@RequestBody GenerateRequest request,
-                                                   @AuthenticationPrincipal MemberDetails memberDetails) {
+    public ResponseEntity<?> generateSpecification(
+            @RequestBody GenerateRequest request,
+            @AuthenticationPrincipal MemberDetails memberDetails) {
 
-        // 1. GenerationService가 직접 CompletableFuture를 반환
         CompletableFuture<GenerateResponse> future = generationService.generateSpec(
                 request.getModel(),
                 request.getSpecExample(),
                 request.getProductNameExample(),
-                memberDetails.member() // 사용자 정보 전달
+                memberDetails.member()
         );
 
-        // 2. 생성된 Future를 TaskService에 등록하고 taskId를 받음
+        // TaskService에 작업을 등록하고 taskId를 받음
         String taskId = taskService.submitTask(future);
 
-        try {
-            // 3. 해당 Future를 직접 사용하여 결과를 기다림
-            GenerateResponse response = future.get(RESPONSE_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-//            log.info("응답 성공: Task {}", taskId);
-            return ResponseEntity.ok(response);
-
-        } catch (TimeoutException e) {
-//            log.warn("Task {}가 시간 초과되어 폴링 방식으로 전환합니다.", taskId);
-            return ResponseEntity.accepted().body(Map.of("taskId", taskId));
-
-        } catch (ExecutionException e) {
-            Throwable cause = e.getCause();
-//            log.error("Task {} 실행 중 예외 발생", taskId, cause);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(TaskResult.failed(cause.getMessage()));
-
-        } catch (CancellationException e) {
-//            log.info("Task {}가 대기 중 취소되었습니다.", taskId);
-            return ResponseEntity.ok(TaskResult.cancelled());
-
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-//            log.error("Task {} 처리 중 스레드가 중단되었습니다.", taskId, e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "Request processing was interrupted."));
-        }
+        // 동기 대기 로직(try-catch)을 제거하고, taskId를 즉시 반환
+        log.info("전자제품 작업(Task ID: {})이 접수되어 폴링 방식으로 전환합니다.", taskId);
+        return ResponseEntity.accepted().body(Map.of("taskId", taskId));
     }
 
     // --- [NEW] 비전자제품용 API 엔드포인트 추가 ---
@@ -82,23 +61,16 @@ public class GenerationController {
             @RequestBody GenerateGeneralRequest request,
             @AuthenticationPrincipal MemberDetails memberDetails) {
 
-        // 비동기 서비스 호출
         CompletableFuture<GenerateGeneralResponse> future = generationService.generateGeneralSpec(
                 request.getProductName(),
                 request.getSpecExample(),
                 memberDetails.member()
         );
 
-        // 비전자제품 API는 상대적으로 빠를 것으로 예상되므로, 여기서는 Polling 방식 없이 동기 대기만으로 처리함
-        try {
-            GenerateGeneralResponse response = future.get(RESPONSE_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            log.error("비전자제품 생성 중 예외 발생", e);
-            // 에러 원인에 따라 더 상세한 처리가 가능합니다.
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", "AI 생성 중 오류가 발생했습니다: " + e.getMessage()));
-        }
+        String taskId = taskService.submitTask(future);
+
+        log.info("비전자제품 작업(Task ID: {})이 접수되어 폴링 방식으로 전환합니다.", taskId);
+        return ResponseEntity.accepted().body(Map.of("taskId", taskId));
     }
 
 

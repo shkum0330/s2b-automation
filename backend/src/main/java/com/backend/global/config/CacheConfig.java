@@ -12,11 +12,10 @@ import java.util.concurrent.TimeUnit;
 @Configuration
 public class CacheConfig {
     @Bean
-    public Cache<String, CompletableFuture<GenerateResponse>> taskCache() {
-        // 작업 완료/실패 후 10분 동안 결과를 유지하고 자동으로 제거
+    public Cache<String, CompletableFuture<?>> taskCache() {
         return Caffeine.newBuilder()
                 .expireAfterWrite(10, TimeUnit.MINUTES)
-                .maximumSize(1000) // 동시에 관리할 최대 작업 수
+                .maximumSize(1000)
                 .build();
     }
 }
