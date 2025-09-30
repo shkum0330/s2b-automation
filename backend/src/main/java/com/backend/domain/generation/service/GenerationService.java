@@ -14,6 +14,7 @@ public interface GenerationService {
      * @param model              조사할 제품의 모델명
      * @param specExample        참고할 규격 형식 예시
      * @param productNameExample 참고할 물품명 형식 예시
+     * @param member             요청 회원(크레딧 차감)
      * @return 생성된 제품 정보가 담긴 GenerateResponse 객체
      * @throws GenerateApiException API 호출 또는 데이터 처리 중 발생할 수 있는 예외
      */
@@ -23,7 +24,8 @@ public interface GenerationService {
      * 비전자제품 제품명과 예시를 기반으로 제품 사양 정보를 생성
      *
      * @param specExample        참고할 규격 형식 예시
-     * @param productName         을 물품명
+     * @param productName        물품명
+     * @param member             요청 회원(크레딧 차감)
      * @return 생성된 제품 정보가 담긴 GenerateGeneralResponse 객체
      * @throws GenerateApiException API 호출 또는 데이터 처리 중 발생할 수 있는 예외
      */

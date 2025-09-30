@@ -251,7 +251,7 @@ class MainWindow(QWidget):
         is_electronic = self.radio_electronic.isChecked()
         if is_electronic and "taskId" in json_body:
             self.current_task_id = json_body["taskId"]
-            self.status_label.setText(f"상태: ⏳ 폴링 시작...")
+            self.status_label.setText("상태: ⏳ 폴링 시작...")
             self.polling_timer.start(3000)
         else:
             self.handle_api_result(json_body.get("result", json_body))
@@ -279,7 +279,7 @@ class MainWindow(QWidget):
             self.polling_timer.stop()
             self.handle_error(f"작업 실패 또는 취소됨 (상태: {status})")
         else:
-            self.status_label.setText(f"상태: ⏳ 작업 진행 중...")
+            self.status_label.setText("상태: ⏳ 작업 진행 중...")
 
     def cancel_api_call(self):
         if not self.current_task_id:

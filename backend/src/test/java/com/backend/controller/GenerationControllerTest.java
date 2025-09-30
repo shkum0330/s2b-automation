@@ -6,6 +6,7 @@ import com.backend.domain.generation.dto.GenerateResponse;
 import com.backend.domain.generation.controller.GenerationController;
 import com.backend.domain.generation.service.GenerationService;
 import com.backend.domain.generation.service.TaskService;
+import com.backend.domain.member.service.MemberService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -68,6 +69,11 @@ class GenerationControllerTest {
         @Bean
         public Executor taskExecutor() {
             return Mockito.mock(Executor.class);
+        }
+
+         @Bean
+         public MemberService memberService() {
+            return Mockito.mock(MemberService.class);
         }
     }
 
