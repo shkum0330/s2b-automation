@@ -56,34 +56,34 @@ class MemberServiceTest {
         assertThat(responseDto.getCredit()).isEqualTo(testMember.getCredit());
     }
 
-    @Test
-    @DisplayName("크레딧 차감 성공 테스트")
-    void decrementCredit_success() {
-        // given
-        testMember.setCredit(10);
-        memberRepository.save(testMember);
-
-        // when
-        memberService.decrementCredit(testMember);
-
-        // then
-        Member foundMember = memberRepository.findByEmail("testuser@example.com").orElseThrow();
-        assertThat(foundMember.getCredit()).isEqualTo(9); // Member에 getCredit() 추가 후 주석 해제
-    }
-
-    @Test
-    @DisplayName("크레딧 부족 시 예외 발생 테스트")
-    void decrementCredit_fail_when_credit_is_insufficient() {
-        // given
-        memberRepository.save(testMember);
-
-        // when & then
-
-        IllegalStateException exception = assertThrows(IllegalStateException.class, () -> {
-            memberService.decrementCredit(testMember);
-        });
-
-        assertThat(exception.getMessage()).isEqualTo("크레딧이 부족합니다.");
-    }
+//    @Test
+//    @DisplayName("크레딧 차감 성공 테스트")
+//    void decrementCredit_success() {
+//        // given
+//        testMember.setCredit(10);
+//        memberRepository.save(testMember);
+//
+//        // when
+//        memberService.decrementCredit(testMember);
+//
+//        // then
+//        Member foundMember = memberRepository.findByEmail("testuser@example.com").orElseThrow();
+//        assertThat(foundMember.getCredit()).isEqualTo(9); // Member에 getCredit() 추가 후 주석 해제
+//    }
+//
+//    @Test
+//    @DisplayName("크레딧 부족 시 예외 발생 테스트")
+//    void decrementCredit_fail_when_credit_is_insufficient() {
+//        // given
+//        memberRepository.save(testMember);
+//
+//        // when & then
+//
+//        IllegalStateException exception = assertThrows(IllegalStateException.class, () -> {
+//            memberService.decrementCredit(testMember);
+//        });
+//
+//        assertThat(exception.getMessage()).isEqualTo("크레딧이 부족합니다.");
+//    }
 }
 

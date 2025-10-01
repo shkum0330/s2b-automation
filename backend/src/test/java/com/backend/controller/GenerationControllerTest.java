@@ -3,9 +3,10 @@ package com.backend.controller;
 import com.backend.domain.generation.dto.CertificationResponse;
 import com.backend.domain.generation.dto.GenerateRequest;
 import com.backend.domain.generation.dto.GenerateResponse;
-import com.backend.domain.generation.controller.ApiController;
+import com.backend.domain.generation.controller.GenerationController;
 import com.backend.domain.generation.service.GenerationService;
 import com.backend.domain.generation.service.TaskService;
+import com.backend.domain.member.service.MemberService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -40,10 +41,10 @@ import static org.springframework.restdocs.request.RequestDocumentation.paramete
 import static org.springframework.restdocs.request.RequestDocumentation.pathParameters;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(ApiController.class)
+@WebMvcTest(GenerationController.class)
 @ExtendWith(RestDocumentationExtension.class)
-@Import(ApiControllerTest.TestConfig.class)
-class ApiControllerTest {
+@Import(GenerationControllerTest.TestConfig.class)
+class GenerationControllerTest {
     @Autowired
     private MockMvc mockMvc;
     @Autowired
@@ -68,6 +69,11 @@ class ApiControllerTest {
         @Bean
         public Executor taskExecutor() {
             return Mockito.mock(Executor.class);
+        }
+
+         @Bean
+         public MemberService memberService() {
+            return Mockito.mock(MemberService.class);
         }
     }
 
