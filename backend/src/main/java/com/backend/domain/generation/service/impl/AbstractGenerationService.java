@@ -1,8 +1,8 @@
 package com.backend.domain.generation.service.impl;
 
 import com.backend.domain.generation.dto.CertificationResponse;
-import com.backend.domain.generation.dto.GenerateGeneralResponse;
-import com.backend.domain.generation.dto.GenerateResponse;
+import com.backend.domain.generation.dto.GenerateElectronicResponse;
+import com.backend.domain.generation.dto.GenerateNonElectronicResponse;
 import com.backend.domain.member.entity.Member;
 import com.backend.domain.member.service.MemberService;
 import com.backend.global.exception.GenerateApiException;
@@ -36,7 +36,7 @@ public abstract class AbstractGenerationService implements GenerationService {
     private final Executor taskExecutor;
 
     @Override
-    public CompletableFuture<GenerateResponse> generateSpec(String model, String specExample, String productNameExample, Member member) {
+    public CompletableFuture<GenerateElectronicResponse> generateSpec(String model, String specExample, String productNameExample, Member member) {
 
         // 스크래핑 작업은 별도의 스레드에서 실행
         CompletableFuture<Optional<String>> g2bFuture = CompletableFuture.supplyAsync(
@@ -45,10 +45,10 @@ public abstract class AbstractGenerationService implements GenerationService {
                 () -> scrapingService.findCountryOfOrigin(model), taskExecutor);
 
         CompletableFuture<CertificationResponse> certFuture = this.fetchCertification(model);
-        CompletableFuture<GenerateResponse> mainSpecFuture = this.fetchMainSpec(model, specExample, productNameExample);
+        CompletableFuture<GenerateElectronicResponse> mainSpecFuture = this.fetchMainSpec(model, specExample, productNameExample);
 
         // thenCombineAsync를 사용하여 논블로킹 방식으로 비동기 결과들을 조합
-        CompletableFuture<GenerateResponse> combinedFuture =  mainSpecFuture
+        CompletableFuture<GenerateElectronicResponse> combinedFuture =  mainSpecFuture
                 .thenCombineAsync(certFuture, (mainSpec, cert) -> {
                     mainSpec.setCertificationNumber(cert);
                     return mainSpec;
@@ -82,20 +82,20 @@ public abstract class AbstractGenerationService implements GenerationService {
     }
 
     @Override
-    public CompletableFuture<GenerateGeneralResponse> generateGeneralSpec(String productName, String specExample, Member member) throws GenerateApiException {
+    public CompletableFuture<GenerateNonElectronicResponse> generateGeneralSpec(String productName, String specExample, Member member) throws GenerateApiException {
         // 비전자제품용 프롬프트 생성
         String prompt = promptBuilder.buildGeneralProductSpecPrompt(productName, specExample);
         HttpEntity<Map<String, Object>> requestEntity = createRequestEntity(prompt);
         String apiUrl = getApiUrl();
 
         // AI API 호출
-        CompletableFuture<GenerateGeneralResponse> future = webClient.post()
+        CompletableFuture<GenerateNonElectronicResponse> future = webClient.post()
                 .uri(apiUrl)
                 .headers(headers -> headers.addAll(requestEntity.getHeaders()))
                 .bodyValue(requestEntity.getBody())
                 .retrieve()
                 .bodyToMono(String.class)
-                .map(jsonResponse -> parseResponse(jsonResponse, GenerateGeneralResponse.class)) // GenerateGeneralResponse로 파싱
+                .map(jsonResponse -> parseResponse(jsonResponse, GenerateNonElectronicResponse.class)) // GenerateGeneralResponse로 파싱
                 .toFuture();
 
         // 비동기 작업 완료 시 크레딧 차감
@@ -148,7 +148,7 @@ public abstract class AbstractGenerationService implements GenerationService {
             maxAttempts = 3,
             backoff = @Backoff(delay = 2000)
     )
-    protected CompletableFuture<GenerateResponse> fetchMainSpec(String model, String specExample, String productNameExample) {
+    protected CompletableFuture<GenerateElectronicResponse> fetchMainSpec(String model, String specExample, String productNameExample) {
         String prompt = promptBuilder.buildProductSpecPrompt(model, specExample, productNameExample);
         HttpEntity<Map<String, Object>> requestEntity = createRequestEntity(prompt);
         String apiUrl = getApiUrl();
@@ -161,7 +161,7 @@ public abstract class AbstractGenerationService implements GenerationService {
                 .bodyValue(requestEntity.getBody())
                 .retrieve()
                 .bodyToMono(String.class)
-                .map(jsonResponse -> parseResponse(jsonResponse, GenerateResponse.class))
+                .map(jsonResponse -> parseResponse(jsonResponse, GenerateElectronicResponse.class))
                 .toFuture();
     }
 

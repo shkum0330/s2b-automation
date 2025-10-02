@@ -3,7 +3,7 @@ package com.backend.domain.generation.dto;
 import lombok.Data;
 
 @Data
-public class GenerateResponse {
+public class GenerateElectronicResponse {
     private String productName;
     private String specification;
     private String modelName;

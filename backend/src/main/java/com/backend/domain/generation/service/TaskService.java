@@ -1,6 +1,5 @@
 package com.backend.domain.generation.service;
 
-import com.backend.domain.generation.dto.GenerateResponse;
 import com.backend.domain.generation.async.TaskResult;
 import com.github.benmanes.caffeine.cache.Cache;
 import lombok.RequiredArgsConstructor;

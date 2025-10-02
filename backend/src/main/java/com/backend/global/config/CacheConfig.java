@@ -1,6 +1,5 @@
 package com.backend.global.config;
 
-import com.backend.domain.generation.dto.GenerateResponse;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.RemovalCause;

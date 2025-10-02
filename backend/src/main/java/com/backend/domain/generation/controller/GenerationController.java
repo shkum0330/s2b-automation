@@ -1,27 +1,22 @@
 package com.backend.domain.generation.controller;
 
-import com.backend.domain.generation.dto.GenerateGeneralRequest;
-import com.backend.domain.generation.dto.GenerateGeneralResponse;
-import com.backend.domain.generation.dto.GenerateRequest;
-import com.backend.domain.generation.dto.GenerateResponse;
+import com.backend.domain.generation.dto.GenerateElectronicRequest;
+import com.backend.domain.generation.dto.GenerateElectronicResponse;
 import com.backend.domain.generation.async.TaskResult;
+import com.backend.domain.generation.dto.GenerateNonElectronicRequest;
+import com.backend.domain.generation.dto.GenerateNonElectronicResponse;
 import com.backend.domain.generation.service.GenerationService;
 import com.backend.domain.generation.service.TaskService;
-import com.backend.domain.member.service.MemberService;
 import com.backend.global.auth.entity.MemberDetails;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CancellationException;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 @Slf4j
 @RestController
@@ -34,11 +29,11 @@ public class GenerationController {
 
     @PostMapping("/generate-spec")
     public ResponseEntity<?> generateSpecification(
-            @RequestBody GenerateRequest request,
+            @Valid @RequestBody GenerateElectronicRequest request,
             @AuthenticationPrincipal MemberDetails memberDetails) {
 
-        CompletableFuture<GenerateResponse> future = generationService.generateSpec(
-                request.getModel(),
+        CompletableFuture<GenerateElectronicResponse> future = generationService.generateSpec(
+                request.getModelName(),
                 request.getSpecExample(),
                 request.getProductNameExample(),
                 memberDetails.member()
@@ -49,10 +44,10 @@ public class GenerationController {
 
     @PostMapping("/generate-general-spec")
     public ResponseEntity<?> generateGeneralSpecification(
-            @RequestBody GenerateGeneralRequest request,
+            @Valid @RequestBody GenerateNonElectronicRequest request,
             @AuthenticationPrincipal MemberDetails memberDetails) {
 
-        CompletableFuture<GenerateGeneralResponse> future = generationService.generateGeneralSpec(
+        CompletableFuture<GenerateNonElectronicResponse> future = generationService.generateGeneralSpec(
                 request.getProductName(),
                 request.getSpecExample(),
                 memberDetails.member()

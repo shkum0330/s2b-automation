@@ -1,6 +1,6 @@
 package com.backend.service;
 
-import com.backend.domain.generation.dto.GenerateResponse;
+import com.backend.domain.generation.dto.GenerateElectronicResponse;
 import com.backend.domain.generation.service.impl.GeminiService;
 import com.backend.domain.member.entity.Member;
 import com.backend.domain.member.entity.Role;
@@ -64,10 +64,10 @@ class GeminiServiceTest {
 
         log.info("\n--- 2. 서비스 메소드 실행 ---");
         try {
-            CompletableFuture<GenerateResponse> future = geminiService.generateSpec(model, specExample, productNameExample, testMember);
+            CompletableFuture<GenerateElectronicResponse> future = geminiService.generateSpec(model, specExample, productNameExample, testMember);
 
             log.info("AI와 스크래핑 작업이 완료될 때까지 대기합니다...");
-            GenerateResponse response = future.get();
+            GenerateElectronicResponse response = future.get();
 
             log.info("\n--- 3. 받아온 모든 특성들 로그 출력 (줄 단위 구분) ---");
             if (response != null) {
