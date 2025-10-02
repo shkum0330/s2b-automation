@@ -28,12 +28,9 @@ import java.util.concurrent.TimeoutException;
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/generation")
 public class GenerationController {
-    private final MemberService memberService;
+
     private final GenerationService generationService;
     private final TaskService taskService;
-
-    // 동기 응답을 시도할 최대 대기 시간 (초)
-    private static final long RESPONSE_TIMEOUT_SECONDS = 60;
 
     @PostMapping("/generate-spec")
     public ResponseEntity<?> generateSpecification(
@@ -47,15 +44,9 @@ public class GenerationController {
                 memberDetails.member()
         );
 
-        // TaskService에 작업을 등록하고 taskId를 받음
-        String taskId = taskService.submitTask(future);
-
-        // 동기 대기 로직(try-catch)을 제거하고, taskId를 즉시 반환
-        log.info("전자제품 작업(Task ID: {})이 접수되어 폴링 방식으로 전환합니다.", taskId);
-        return ResponseEntity.accepted().body(Map.of("taskId", taskId));
+        return processGenerationTask(future, "전자제품");
     }
 
-    // --- [NEW] 비전자제품용 API 엔드포인트 추가 ---
     @PostMapping("/generate-general-spec")
     public ResponseEntity<?> generateGeneralSpecification(
             @RequestBody GenerateGeneralRequest request,
@@ -67,16 +58,12 @@ public class GenerationController {
                 memberDetails.member()
         );
 
-        String taskId = taskService.submitTask(future);
-
-        log.info("비전자제품 작업(Task ID: {})이 접수되어 폴링 방식으로 전환합니다.", taskId);
-        return ResponseEntity.accepted().body(Map.of("taskId", taskId));
+        return processGenerationTask(future, "비전자제품");
     }
 
-
     @GetMapping("/result/{taskId}")
-    public ResponseEntity<?> getResult(@PathVariable String taskId) {
-        TaskResult<GenerateResponse> result = taskService.getTaskResult(taskId);
+    public ResponseEntity<TaskResult<?>> getResult(@PathVariable String taskId) {
+        TaskResult<?> result = taskService.getTaskResult(taskId);
         return ResponseEntity.ok(result);
     }
 
@@ -84,5 +71,17 @@ public class GenerationController {
     public ResponseEntity<?> cancelTask(@PathVariable String taskId) {
         boolean cancelled = taskService.cancelTask(taskId);
         return ResponseEntity.ok(Map.of("success", cancelled));
+    }
+
+    /**
+     * 비동기 생성 작업을 TaskService에 등록하고 taskId를 반환하는 공통 로직
+     * @param future 처리할 비동기 작업
+     * @param taskType 로깅을 위한 작업 유형 문자열
+     * @return taskId가 담긴 ResponseEntity
+     */
+    private ResponseEntity<?> processGenerationTask(CompletableFuture<?> future, String taskType) {
+        String taskId = taskService.submitTask(future);
+        log.info("{} 작업(Task ID: {})이 접수되어 폴링 방식으로 전환합니다.", taskType, taskId);
+        return ResponseEntity.accepted().body(Map.of("taskId", taskId));
     }
 }
