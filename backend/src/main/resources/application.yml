@@ -44,6 +44,9 @@ gemini:
   api:
     url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent
     key: ${GEMINI_API_KEY}
+  generation:
+    temperature: 0.5
+    max-output-tokens: 8192
 
 chatgpt:
   api:
