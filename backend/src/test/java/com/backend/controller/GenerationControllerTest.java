@@ -1,8 +1,8 @@
 package com.backend.controller;
 
 import com.backend.domain.generation.dto.CertificationResponse;
-import com.backend.domain.generation.dto.GenerateRequest;
-import com.backend.domain.generation.dto.GenerateResponse;
+import com.backend.domain.generation.dto.GenerateElectronicRequest;
+import com.backend.domain.generation.dto.GenerateElectronicResponse;
 import com.backend.domain.generation.controller.GenerationController;
 import com.backend.domain.generation.service.GenerationService;
 import com.backend.domain.generation.service.TaskService;
@@ -88,12 +88,12 @@ class GenerationControllerTest {
     @DisplayName("제품 사양 정보 생성 API")
     void generateSpecification() throws Exception {
         // given - 문서화를 위한 요청 및 응답 객체 설정
-        GenerateRequest request = new GenerateRequest();
-        request.setModel("AX033B310GBD");
+        GenerateElectronicRequest request = new GenerateElectronicRequest();
+        request.setModelName("AX033B310GBD");
         request.setSpecExample("32평형(106㎡) / UV살균 / 에너지효율 2등급 / 380×876×406mm");
         request.setProductNameExample("삼성전자 비스포크 큐브 Air 공기청정기");
 
-        GenerateResponse response = new GenerateResponse();
+        GenerateElectronicResponse response = new GenerateElectronicResponse();
         CertificationResponse certResponse = new CertificationResponse();
         certResponse.setKatsCertificationNumber("YU07266-22001");
         certResponse.setKcCertificationNumber("R-R-SEC-AIR2206");

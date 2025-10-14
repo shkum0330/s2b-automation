@@ -1,82 +1,76 @@
 package com.backend.domain.generation.controller;
 
-import com.backend.domain.generation.dto.GenerateGeneralRequest;
-import com.backend.domain.generation.dto.GenerateGeneralResponse;
-import com.backend.domain.generation.dto.GenerateRequest;
-import com.backend.domain.generation.dto.GenerateResponse;
+import com.backend.domain.generation.dto.GenerateElectronicRequest;
+import com.backend.domain.generation.dto.GenerateElectronicResponse;
 import com.backend.domain.generation.async.TaskResult;
+import com.backend.domain.generation.dto.GenerateNonElectronicRequest;
+import com.backend.domain.generation.dto.GenerateNonElectronicResponse;
 import com.backend.domain.generation.service.GenerationService;
 import com.backend.domain.generation.service.TaskService;
-import com.backend.domain.member.service.MemberService;
 import com.backend.global.auth.entity.MemberDetails;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CancellationException;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
+import java.util.concurrent.CompletionException;
 
 @Slf4j
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/generation")
 public class GenerationController {
-    private final MemberService memberService;
+
     private final GenerationService generationService;
     private final TaskService taskService;
 
-    // 동기 응답을 시도할 최대 대기 시간 (초)
-    private static final long RESPONSE_TIMEOUT_SECONDS = 60;
-
     @PostMapping("/generate-spec")
     public ResponseEntity<?> generateSpecification(
-            @RequestBody GenerateRequest request,
+            @Valid @RequestBody GenerateElectronicRequest request,
             @AuthenticationPrincipal MemberDetails memberDetails) {
 
-        CompletableFuture<GenerateResponse> future = generationService.generateSpec(
-                request.getModel(),
+        // 여러 API를 호출하고 조합하는 비동기 작업
+        CompletableFuture<GenerateElectronicResponse> future = generationService.generateSpec(
+                request.getModelName(),
                 request.getSpecExample(),
                 request.getProductNameExample(),
                 memberDetails.member()
         );
 
-        // TaskService에 작업을 등록하고 taskId를 받음
+        // TaskService에 작업을 등록하고 클라이언트가 폴링할 수 있도록 taskId를 반환
         String taskId = taskService.submitTask(future);
-
-        // 동기 대기 로직(try-catch)을 제거하고, taskId를 즉시 반환
-        log.info("전자제품 작업(Task ID: {})이 접수되어 폴링 방식으로 전환합니다.", taskId);
         return ResponseEntity.accepted().body(Map.of("taskId", taskId));
     }
 
-    // --- [NEW] 비전자제품용 API 엔드포인트 추가 ---
     @PostMapping("/generate-general-spec")
     public ResponseEntity<?> generateGeneralSpecification(
-            @RequestBody GenerateGeneralRequest request,
+            @Valid @RequestBody GenerateNonElectronicRequest request,
             @AuthenticationPrincipal MemberDetails memberDetails) {
 
-        CompletableFuture<GenerateGeneralResponse> future = generationService.generateGeneralSpec(
+        // 단일 AI API만 호출하는 비동기 작업
+        CompletableFuture<GenerateNonElectronicResponse> future = generationService.generateGeneralSpec(
                 request.getProductName(),
                 request.getSpecExample(),
                 memberDetails.member()
         );
 
-        String taskId = taskService.submitTask(future);
-
-        log.info("비전자제품 작업(Task ID: {})이 접수되어 폴링 방식으로 전환합니다.", taskId);
-        return ResponseEntity.accepted().body(Map.of("taskId", taskId));
+        // 폴링이 불필요하므로, 서버에서 결과를 기다렸다가 즉시 반환
+        try {
+            GenerateNonElectronicResponse result = future.join(); // 비동기 작업이 완료될 때까지 대기
+            return ResponseEntity.ok(Map.of("result", result, "taskId", (Object) null));
+        } catch (Exception e) {
+            // 비동기 작업 중 발생한 예외를 처리
+            throw new CompletionException(e.getCause());
+        }
     }
 
-
     @GetMapping("/result/{taskId}")
-    public ResponseEntity<?> getResult(@PathVariable String taskId) {
-        TaskResult<GenerateResponse> result = taskService.getTaskResult(taskId);
+    public ResponseEntity<TaskResult<?>> getResult(@PathVariable String taskId) {
+        TaskResult<?> result = taskService.getTaskResult(taskId);
         return ResponseEntity.ok(result);
     }
 
