@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 
 @Slf4j
 @RestController
@@ -32,6 +33,7 @@ public class GenerationController {
             @Valid @RequestBody GenerateElectronicRequest request,
             @AuthenticationPrincipal MemberDetails memberDetails) {
 
+        // 여러 API를 호출하고 조합하는 비동기 작업
         CompletableFuture<GenerateElectronicResponse> future = generationService.generateSpec(
                 request.getModelName(),
                 request.getSpecExample(),
@@ -39,7 +41,9 @@ public class GenerationController {
                 memberDetails.member()
         );
 
-        return processGenerationTask(future, "전자제품");
+        // TaskService에 작업을 등록하고 클라이언트가 폴링할 수 있도록 taskId를 반환
+        String taskId = taskService.submitTask(future);
+        return ResponseEntity.accepted().body(Map.of("taskId", taskId));
     }
 
     @PostMapping("/generate-general-spec")
@@ -47,13 +51,21 @@ public class GenerationController {
             @Valid @RequestBody GenerateNonElectronicRequest request,
             @AuthenticationPrincipal MemberDetails memberDetails) {
 
+        // 단일 AI API만 호출하는 비동기 작업
         CompletableFuture<GenerateNonElectronicResponse> future = generationService.generateGeneralSpec(
                 request.getProductName(),
                 request.getSpecExample(),
                 memberDetails.member()
         );
 
-        return processGenerationTask(future, "비전자제품");
+        // 폴링이 불필요하므로, 서버에서 결과를 기다렸다가 즉시 반환
+        try {
+            GenerateNonElectronicResponse result = future.join(); // 비동기 작업이 완료될 때까지 대기
+            return ResponseEntity.ok(Map.of("result", result, "taskId", (Object) null));
+        } catch (Exception e) {
+            // 비동기 작업 중 발생한 예외를 처리
+            throw new CompletionException(e.getCause());
+        }
     }
 
     @GetMapping("/result/{taskId}")
@@ -66,17 +78,5 @@ public class GenerationController {
     public ResponseEntity<?> cancelTask(@PathVariable String taskId) {
         boolean cancelled = taskService.cancelTask(taskId);
         return ResponseEntity.ok(Map.of("success", cancelled));
-    }
-
-    /**
-     * 비동기 생성 작업을 TaskService에 등록하고 taskId를 반환하는 공통 로직
-     * @param future 처리할 비동기 작업
-     * @param taskType 로깅을 위한 작업 유형 문자열
-     * @return taskId가 담긴 ResponseEntity
-     */
-    private ResponseEntity<?> processGenerationTask(CompletableFuture<?> future, String taskType) {
-        String taskId = taskService.submitTask(future);
-        log.info("{} 작업(Task ID: {})이 접수되어 폴링 방식으로 전환합니다.", taskType, taskId);
-        return ResponseEntity.accepted().body(Map.of("taskId", taskId));
     }
 }
