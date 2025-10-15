@@ -20,10 +20,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -69,7 +65,7 @@ public class MemberService {
         if (!(authentication.getPrincipal() instanceof MemberDetails)) {
             throw new AuthenticationException("잘못된 인증 정보입니다.");
         }
-        Long memberId = ((MemberDetails) authentication.getPrincipal()).member().getId();
+        Long memberId = ((MemberDetails) authentication.getPrincipal()).member().getMember_id();
 
         jwtProvider.validateToken(refreshToken);
         refreshTokenService.removeRefreshTokenByKeyEmail(jwtProvider.getSubjectFromToken(refreshToken));
