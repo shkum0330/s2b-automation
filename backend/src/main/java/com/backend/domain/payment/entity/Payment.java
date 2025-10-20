@@ -40,4 +40,9 @@ public class Payment extends BaseTimeEntity {
         this.status = status;
         this.member = member;
     }
+
+    public void completePayment(String paymentKey) {
+        this.paymentKey = paymentKey;
+        this.status = "DONE";
+    }
 }

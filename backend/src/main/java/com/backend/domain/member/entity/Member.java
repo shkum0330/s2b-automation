@@ -14,7 +14,7 @@ public class Member extends BaseTimeEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @EqualsAndHashCode.Include
-    private Long member_id;
+    private Long memberId;
 
     @Column(nullable = false, unique = true)
     private String email;
@@ -26,6 +26,7 @@ public class Member extends BaseTimeEntity {
     private String phone;
 
     @Enumerated(EnumType.STRING)
+    @Setter // 멤버십 변경을 위해 Setter 추가
     @Column(nullable = false, length = 20)
     private Role role;
 
@@ -39,12 +40,15 @@ public class Member extends BaseTimeEntity {
 
     @Setter
     @Column(nullable = false)
-    private int credit = 0;
+    private int credit = 0; // 기존 로직 (새 모델에서는 주 사용 로직이 아님)
 
     @Column(nullable = false)
     private int dailyRequestCount = 0;
 
     private LocalDate lastRequestDate;
+
+    @Setter // 멤버십 변경을 위해 Setter 추가
+    private LocalDate planExpiresAt; // 구독 만료일
 
     @Builder
     public Member(String name, String email, String provider, String providerId, Role role) {
@@ -55,11 +59,21 @@ public class Member extends BaseTimeEntity {
         this.role = role;
     }
 
-    // 잔여 횟수 차감 비즈니스 로직
-    public void decrementRequestCount() {
-        if (this.credit <= 0) {
-            throw new IllegalStateException("크레딧이 부족합니다.");
-        }
-        this.credit--;
+    /**
+     * 새로운 멤버십 플랜으로 갱신
+     */
+    public void updateMembership(Role newRole, int durationDays) {
+        this.role = newRole;
+        this.planExpiresAt = LocalDate.now().plusDays(durationDays);
+        this.resetDailyCount(LocalDate.now()); // 플랜 갱신 시 카운트도 초기화
     }
+
+    /**
+     * 일일 사용량을 초기화
+     */
+    public void resetDailyCount(LocalDate date) {
+        this.dailyRequestCount = 0;
+        this.lastRequestDate = date;
+    }
+
 }

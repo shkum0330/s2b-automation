@@ -83,7 +83,7 @@ public class KakaoService {
 
         // 6. LoginResponseDto 구성
         return LoginResponseDto.builder()
-                .memberId(kakaoUser.getMember_id())
+                .memberId(kakaoUser.getMemberId())
                 .email(kakaoUser.getEmail())
                 .isNewMember(kakaoRegisterResultDto.isNewMember())
                 .hasMemberInfo(kakaoUser.getName() != null && !kakaoUser.getName().isEmpty())

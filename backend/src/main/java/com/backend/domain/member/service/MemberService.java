@@ -3,6 +3,7 @@ package com.backend.domain.member.service;
 import com.backend.domain.member.dto.MemberInfoDto;
 import com.backend.domain.member.dto.MemberResponseDto;
 import com.backend.domain.member.entity.Member;
+import com.backend.domain.member.entity.Role;
 import com.backend.domain.member.repository.MemberRepository;
 import com.backend.global.auth.entity.MemberDetails;
 import com.backend.global.auth.jwt.JwtProvider;
@@ -20,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.time.LocalDate;
 
 @Service
 @RequiredArgsConstructor
@@ -65,7 +67,7 @@ public class MemberService {
         if (!(authentication.getPrincipal() instanceof MemberDetails)) {
             throw new AuthenticationException("잘못된 인증 정보입니다.");
         }
-        Long memberId = ((MemberDetails) authentication.getPrincipal()).member().getMember_id();
+        Long memberId = ((MemberDetails) authentication.getPrincipal()).member().getMemberId();
 
         jwtProvider.validateToken(refreshToken);
         refreshTokenService.removeRefreshTokenByKeyEmail(jwtProvider.getSubjectFromToken(refreshToken));
@@ -84,16 +86,40 @@ public class MemberService {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void decrementCredit(Long memberId) {
+        LocalDate today = LocalDate.now();
+
+        // 1. 회원 정보를 읽어옴
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new IllegalArgumentException("ID에 해당하는 멤버를 찾을 수 없습니다: " + memberId));
 
-        // 영속 상태의 엔티티를 수정하면 더티 체킹으로 인해 트랜잭션 종료 시 자동으로 DB에 반영됨
-        log.info("요청 전 크레딧: {}",member.getCredit());
-        int updated = memberRepository.decrementCreditIfPossible(memberId);
-        if (updated == 0) {
-            throw new IllegalStateException("크레딧이 부족합니다.");
+        // 2. 구독 만료일 체크 및 갱신
+        if (member.getPlanExpiresAt() != null && member.getPlanExpiresAt().isBefore(today)) {
+            member.setRole(Role.FREE_USER);
+            member.setPlanExpiresAt(null);
+            log.info("사용자(ID: {})의 구독이 만료되어 FREE_USER로 변경되었습니다.", memberId);
         }
-        log.info("요청 후 크레딧: {}",member.getCredit());
+
+        // 3. 일일 사용량 초기화 체크
+        if (member.getLastRequestDate() == null || !member.getLastRequestDate().equals(today)) {
+            member.resetDailyCount(today);
+            // resetDailyCount는 dailyRequestCount를 0으로 설정하므로, DB에 즉시 반영
+            memberRepository.saveAndFlush(member);
+            log.info("사용자(ID: {})의 일일 사용량이 초기화되었습니다.", memberId);
+        }
+
+        // 4. 현재 등급의 일일 한도 확인
+        int dailyLimit = member.getRole().getDailyCreditLimit();
+
+        // 5. 한도 내에서 일일 사용량 원자적으로 증가
+        log.info("사용자(ID: {}) 크레딧 사용 시도. (현재 사용량: {}, 한도: {})", memberId, member.getDailyRequestCount(), dailyLimit);
+
+        int updated = memberRepository.incrementDailyCountIfPossible(memberId, dailyLimit);
+
+        if (updated == 0) {
+            throw new IllegalStateException("일일 크레딧 한도를 초과했습니다.");
+        }
+
+        log.info("사용자(ID: {}) 크레딧 사용 성공. (갱신 후 사용량: {}/{})", memberId, member.getDailyRequestCount() + 1, dailyLimit);
     }
 
     @Transactional(readOnly = true)
