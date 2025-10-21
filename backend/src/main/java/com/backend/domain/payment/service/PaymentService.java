@@ -3,60 +3,140 @@ package com.backend.domain.payment.service;
 import com.backend.domain.member.entity.Member;
 import com.backend.domain.member.entity.Role;
 import com.backend.domain.member.repository.MemberRepository;
+import com.backend.domain.payment.dto.TossConfirmResponseDto;
 import com.backend.domain.payment.entity.Payment;
 import com.backend.domain.payment.repository.PaymentRepository;
+import com.backend.global.exception.NotFoundException;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Mono;
 
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
+import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional
 public class PaymentService {
+
     private final PaymentRepository paymentRepository;
     private final MemberRepository memberRepository;
+    private final WebClient.Builder webClientBuilder;
 
-    // 결제 요청 전 DB에 주문 정보 저장
+    @Value("${toss.secret-key}")
+    private String tossSecretKey;
+
+    @Value("${toss.api.url}")
+    private String tossApiUrl;
+
+    private WebClient tossWebClient;
+    private static final int SUBSCRIPTION_DAYS = 30; // 구독 일수
+
+    @PostConstruct
+    public void init() {
+        String basicAuth = Base64.getEncoder().encodeToString((tossSecretKey + ":").getBytes(StandardCharsets.UTF_8));
+
+        this.tossWebClient = webClientBuilder
+                .baseUrl(tossApiUrl)
+                .defaultHeader(HttpHeaders.AUTHORIZATION, "Basic " + basicAuth)
+                .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                .build();
+    }
+
+    /**
+     * 1. 결제 요청 (DB에 READY 상태로 저장)
+     */
     public Payment requestPayment(Member member, Long amount) {
-        String orderId = UUID.randomUUID().toString();
+        if (!isValidAmount(amount)) {
+            throw new IllegalArgumentException("유효하지 않은 결제 금액입니다.");
+        }
 
+        String orderId = UUID.randomUUID().toString();
         Payment payment = Payment.builder()
                 .member(member)
                 .amount(amount)
                 .orderId(orderId)
-                .paymentKey(null)
+                .paymentKey(null) // 승인 전
                 .status("READY")
                 .build();
-
         return paymentRepository.save(payment);
     }
 
-    private void handleSuccessfulPayment(Payment payment, String paymentKey) {
-        payment.completePayment(paymentKey);
+    /**
+     * 2. 결제 승인 (POST /v1/payments/confirm)
+     */
+    public Mono<TossConfirmResponseDto> confirmPayment(String paymentKey, String orderId, Long amount) {
+
+        Payment payment = paymentRepository.findByOrderId(orderId)
+                .orElseThrow(() -> new NotFoundException("주문 정보를 찾을 수 없습니다. (orderId: " + orderId + ")"));
+
+        if (!Objects.equals(payment.getAmount(), amount)) {
+            return Mono.error(new IllegalArgumentException("주문 금액이 일치하지 않습니다."));
+        }
+
+        Map<String, Object> body = Map.of(
+                "paymentKey", paymentKey,
+                "orderId", orderId,
+                "amount", amount
+        );
+
+        return tossWebClient.post()
+                .uri("/v1/payments/confirm")
+                .header("Idempotency-Key", orderId) // 멱등성 키 추가
+                .bodyValue(body)
+                .retrieve()
+                .bodyToMono(TossConfirmResponseDto.class)
+                .doOnSuccess(response -> {
+                    if ("DONE".equals(response.getStatus())) {
+                        handleSuccessfulPayment(payment, response);
+                    } else {
+                        log.warn("결제 승인은 되었으나 상태가 DONE이 아님: {}", response.getStatus());
+                    }
+                })
+                .doOnError(error -> {
+                    log.error("결제 승인 API 호출 실패: {}", error.getMessage());
+                });
+    }
+
+    /**
+     * 3. 결제 성공 후속 처리 (DB 업데이트 및 멤버십 적용)
+     */
+    private void handleSuccessfulPayment(Payment payment, TossConfirmResponseDto response) {
+
+        payment.completePayment(response.getPaymentKey());
 
         Member member = payment.getMember();
         Long amount = payment.getAmount();
-        int durationDays = 30; // 모든 플랜이 30일 기준
 
         Role newRole;
-        if (amount == 30000L) {
+        if (amount == 29900L) {
             newRole = Role.PLAN_30K;
-        } else if (amount == 50000L) {
+        } else if (amount == 49900L) {
             newRole = Role.PLAN_50K;
+        } else if (amount == 99000L) {
+            newRole = Role.PLAN_100K;
         } else {
-            // todo: 정의되지 않은 금액 처리(임시로 무료 사용자 유지)
-            newRole = member.getRole(); // 기존 역할 유지
-            durationDays = 0; // 기간 변경 없음
+            log.warn("handleSuccessfulPayment: 유효하지 않은 금액 {}이 승인 처리되었습니다.", amount);
+            return;
         }
 
-        if (durationDays > 0) {
-            member.updateMembership(newRole, durationDays);
-        }
-
-        // 변경된 Member, Payment 엔티티 저장
+        member.updateMembership(newRole, SUBSCRIPTION_DAYS);
         memberRepository.save(member);
-        paymentRepository.save(payment);
+    }
+
+    // 유효한 플랜 금액인지 확인하는 헬퍼 메서드
+    private boolean isValidAmount(Long amount) {
+        return amount == 29900L || amount == 49900L || amount == 100000L;
     }
 }

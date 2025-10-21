@@ -12,12 +12,13 @@ import lombok.NoArgsConstructor;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Payment extends BaseTimeEntity {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long payment_id;
+    private Long paymentId;
 
     @Column(nullable = false, unique = true)
-    private String paymentKey; // 결제의 고유 키
+    private String paymentKey; // 결제의 고유 키 (승인 시 저장)
 
     @Column(nullable = false, unique = true)
     private String orderId; // 주문 ID
@@ -26,7 +27,7 @@ public class Payment extends BaseTimeEntity {
     private Long amount; // 결제 금액
 
     @Column(nullable = false)
-    private String status; // 결제 상태 (DONE, CANCELED 등)
+    private String status; // 결제 상태 (READY, DONE, CANCELED 등)
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "member_id", nullable = false)

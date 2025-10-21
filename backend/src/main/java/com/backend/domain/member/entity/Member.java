@@ -40,14 +40,14 @@ public class Member extends BaseTimeEntity {
 
     @Setter
     @Column(nullable = false)
-    private int credit = 0; // 기존 로직 (새 모델에서는 주 사용 로직이 아님)
+    private int credit = 0;
 
     @Column(nullable = false)
     private int dailyRequestCount = 0;
 
     private LocalDate lastRequestDate;
 
-    @Setter // 멤버십 변경을 위해 Setter 추가
+    @Setter
     private LocalDate planExpiresAt; // 구독 만료일
 
     @Builder
@@ -59,18 +59,14 @@ public class Member extends BaseTimeEntity {
         this.role = role;
     }
 
-    /**
-     * 새로운 멤버십 플랜으로 갱신
-     */
+    // 새로운 멤버십 플랜으로 갱신
     public void updateMembership(Role newRole, int durationDays) {
         this.role = newRole;
         this.planExpiresAt = LocalDate.now().plusDays(durationDays);
-        this.resetDailyCount(LocalDate.now()); // 플랜 갱신 시 카운트도 초기화
+        this.resetDailyCount(LocalDate.now());
     }
 
-    /**
-     * 일일 사용량을 초기화
-     */
+    // 일일 사용량 초기화
     public void resetDailyCount(LocalDate date) {
         this.dailyRequestCount = 0;
         this.lastRequestDate = date;
