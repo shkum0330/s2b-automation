@@ -51,26 +51,33 @@ public class PaymentController {
      * 2. 결제 승인 (Toss 리다이렉트 URL)
      */
     @GetMapping("/success")
-    public Mono<ResponseEntity<?>> successPayment(
+    public Mono<ResponseEntity<Map<String, Object>>> successPayment(
             @RequestParam String paymentKey,
             @RequestParam String orderId,
             @RequestParam Long amount
     ) {
         return paymentService.confirmPayment(paymentKey, orderId, amount)
-                .map(responseDto -> ResponseEntity.ok(Map.of(
-                        "message", "결제가 성공적으로 완료되었습니다.",
-                        "orderId", responseDto.getOrderId(),
-                        "totalAmount", responseDto.getTotalAmount()
-                )))
+                .map(responseDto -> {
+                    ResponseEntity<Map<String, Object>> successResponse = ResponseEntity.ok(Map.of(
+                            "message", "결제가 성공적으로 완료되었습니다.",
+                            "orderId", responseDto.getOrderId(),
+                            "totalAmount", responseDto.getTotalAmount()
+                    ));
+                    return successResponse;
+                })
                 .onErrorResume(IllegalArgumentException.class, e -> {
-                    // 금액 불일치 등 유효성 검사 실패
                     log.warn("결제 승인 실패 (IllegalArgumentException): {}", e.getMessage());
-                    return Mono.just(ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage())));
+                    ResponseEntity<Map<String, Object>> errorResponse = ResponseEntity
+                            .status(HttpStatus.BAD_REQUEST)
+                            .body(Map.of("message", e.getMessage()));
+                    return Mono.just(errorResponse);
                 })
                 .onErrorResume(Exception.class, e -> {
-                    // 토스 API 연동 실패 등 기타 예외
                     log.error("결제 승인 중 심각한 오류 발생", e);
-                    return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("message", "결제 승인 중 오류가 발생했습니다.")));
+                    ResponseEntity<Map<String, Object>> errorResponse = ResponseEntity
+                            .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                            .body(Map.of("message", "결제 승인 중 오류가 발생했습니다."));
+                    return Mono.just(errorResponse);
                 });
     }
 
