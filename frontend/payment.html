@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <title>S2B 결제</title>
+    <script src="https://js.tosspayments.com/v2/payment-widget"></script>
+    <style>
+      body { background-color: #f9f9f9; }
+    </style>
+  </head>
+  <body>
+    <div id="payment-widget"></div>
+
+    <script>
+      // ------------------------------------
+      // (이 값들은 Python에서 주입받을 예정)
+      let CLIENT_KEY = "test_ck_D5GePWvyJnrK0W0k6q8gLzN97Eoq"; // 임시 테스트 키
+      let ORDER_ID = "";
+      let AMOUNT = 0;
+      let ORDER_NAME = "S2B 크레딧 충전";
+      // ------------------------------------
+
+      const paymentWidget = PaymentWidget(CLIENT_KEY);
+
+      // (Python에서 이 함수를 호출할 것입니다)
+      function startPayment(clientKey, orderId, orderName, amount) {
+        CLIENT_KEY = clientKey;
+        ORDER_ID = orderId;
+        AMOUNT = amount;
+        ORDER_NAME = orderName;
+
+        console.log("Starting payment with:", clientKey, orderId, amount);
+
+        // 결제위젯 렌더링
+        paymentWidget.renderPaymentMethods(
+          "#payment-widget",
+          { value: amount },
+          { variantKey: "DEFAULT" }
+        );
+
+        // 바로 결제창 호출
+        paymentWidget.requestPayment({
+          orderId: ORDER_ID,
+          orderName: ORDER_NAME,
+          successUrl: "http://localhost:8080/api/v1/payments/success",
+          failUrl: "http://localhost:8080/api/v1/payments/fail",
+        });
+      }
+    </script>
+  </body>
+</html>

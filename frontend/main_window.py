@@ -1,10 +1,12 @@
 import pyperclip
 from PyQt5.QtWidgets import (QWidget, QLabel, QLineEdit, QTextEdit,
                              QPushButton, QVBoxLayout, QGroupBox, QGridLayout,
-                             QMessageBox, QHBoxLayout, QRadioButton, QFrame)  # QFrame 추가
+                             QMessageBox, QHBoxLayout, QRadioButton, QFrame,
+                             QDialog, QComboBox)
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QFont
 from api_worker import ApiWorker
+from payment_window import PaymentWindow
 
 
 class MainWindow(QWidget):
@@ -15,9 +17,10 @@ class MainWindow(QWidget):
         self.current_task_id = None
         self.polling_timer = QTimer(self)
         self.polling_timer.timeout.connect(self.check_task_status)
-
+        self.payment_worker = None
         self.input_widgets = {}
         self.output_widgets = {}
+        self.toss_client_key = "test_ck_D5GePWvyJnrK0W0k6q8gLzN97Eoq"
 
         self.initUI()
         self.update_credit_display()
@@ -42,22 +45,33 @@ class MainWindow(QWidget):
         product_type_layout.addStretch(1)
 
         self.credit_label = QLabel("남은 크레딧: -")
-        self.credit_label.setFont(default_font)
         self.refresh_button = QPushButton("새로고침")
-        self.refresh_button.setFixedWidth(150)
-        self.refresh_button.setFont(default_font)
-        self.refresh_button.clicked.connect(self.update_credit_display)
 
-        # --- [NEW] 수직 구분선 생성 ---
+        # --- [결제 UI 추가] ---
+        self.plan_combo = QComboBox()
+        self.plan_combo.setFont(QFont("Apple SD Gothic Neo", 13))
+        self.plan_combo.addItem("플랜 선택", 0)
+        self.plan_combo.addItem("30일 10개 플랜 (29,900원)", 29900)
+        self.plan_combo.addItem("30일 20개 플랜 (49,900원)", 49900)
+        self.plan_combo.addItem("30일 50개 플랜 (100,000원)", 100000)
+
+        self.payment_button = QPushButton("크레딧 충전하기")
+        self.payment_button.setFont(QFont("Apple SD Gothic Neo", 13))
+        self.payment_button.clicked.connect(self.start_payment_request)
+        # --- [결제 UI 끝] ---
+
         separator = QFrame()
-        separator.setFrameShape(QFrame.VLine)  # 수직선 모양
-        separator.setFrameShadow(QFrame.Sunken)  # 약간의 음영 효과
+        separator.setFrameShape(QFrame.VLine)
+        separator.setFrameShadow(QFrame.Sunken)
 
         top_layout = QHBoxLayout()
         top_layout.addLayout(product_type_layout)
-        top_layout.addWidget(separator)  # --- [NEW] 레이아웃에 구분선 추가 ---
+        top_layout.addWidget(separator)
         top_layout.addWidget(self.credit_label)
         top_layout.addWidget(self.refresh_button)
+        top_layout.addWidget(separator)  # 구분선 추가
+        top_layout.addWidget(self.plan_combo)
+        top_layout.addWidget(self.payment_button)
 
         request_group = QGroupBox("서버에 보낼 정보")
         request_group.setFont(default_font)
@@ -318,3 +332,56 @@ class MainWindow(QWidget):
         text = text_widget.text() if isinstance(text_widget, QLineEdit) else text_widget.toPlainText()
         if text:
             pyperclip.copy(text)
+
+    def start_payment_request(self):
+        amount = self.plan_combo.currentData()  # 콤보박스에서 선택된 금액(data) 가져오기
+        if amount == 0:
+            QMessageBox.warning(self, "오류", "충전할 플랜을 선택하세요.")
+            return
+
+        self.payment_button.setEnabled(False)
+        self.payment_button.setText("주문 생성 중...")
+
+        url = 'http://localhost:8080/api/v1/payments/request'
+        payload = {"amount": amount}
+        headers = {"Content-Type": "application/json", "Authorization": self.access_token}
+
+        self.payment_worker = ApiWorker('POST', url, payload=payload, headers=headers)
+        self.payment_worker.finished.connect(self.handle_payment_request_response)
+        self.payment_worker.start()
+
+    def handle_payment_request_response(self, result):
+        self.payment_button.setEnabled(True)
+        self.payment_button.setText("크레딧 충전하기")
+
+        if not result.get('ok'):
+            self._handle_error(result, "주문 생성에 실패했습니다.")
+            return
+
+        json_body = result.get('json', {})
+        order_id = json_body.get('orderId')
+        amount = json_body.get('amount')
+
+        if not order_id or not amount:
+            QMessageBox.critical(self, "오류", "주문 정보를 받아오지 못했습니다.")
+            return
+
+        # 백엔드에서 검증된 정보로 결제 창 열기
+        order_name = self.plan_combo.currentText().split('(')[0].strip()  # "30일 10개 플랜"
+
+        self.open_payment_window(order_id, order_name, amount)
+
+    def open_payment_window(self, order_id, order_name, amount):
+        # QWebEngineView가 포함된 결제 대화상자 열기
+        dialog = PaymentWindow(
+            self.toss_client_key,
+            order_id,
+            order_name,
+            amount,
+            self
+        )
+
+        # 결제 성공 시그널이 오면 크레딧 새로고침
+        dialog.payment_success.connect(self.update_credit_display)
+
+        dialog.exec_()  # 대화상자를 모달로 실행
