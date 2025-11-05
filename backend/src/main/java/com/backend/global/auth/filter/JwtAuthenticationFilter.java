@@ -28,7 +28,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final JwtProvider jwtProvider;
     private final UserDetailsService detailsService;
 
-    // ❗️ 필터가 예외적으로 동작하지 않아야 할 URI 목록
+    // 필터가 예외적으로 동작하지 않아야 할 URI 목록
     private static final List<String> EXCLUDE_URIS = List.of(
             "/api/v1/auth/callback/kakao",
             "/api/v1/auth/token",
@@ -54,7 +54,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         // 1. 헤더에서 Access Token 추출
         String accessToken = jwtProvider.getTokenFromRequest(request, JwtProvider.AUTHORIZATION_HEADER);
-        log.info("accessToken: {}", accessToken);
+        log.debug("accessToken: {}", accessToken);
         // 2. 토큰이 없는 경우, 다음 필터로 위임
         if (!StringUtils.hasText(accessToken)) {
             filterChain.doFilter(request, response);
