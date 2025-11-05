@@ -1,15 +1,15 @@
 package com.backend.domain.generation.service.impl;
 
-import com.backend.domain.generation.dto.CertificationResponse;
-import com.backend.domain.generation.dto.GenerateElectronicResponse;
-import com.backend.domain.generation.dto.GenerateNonElectronicResponse;
+import com.backend.domain.generation.dto.*;
 import com.backend.domain.generation.service.AiProviderService;
 import com.backend.domain.generation.service.GenerationService;
 import com.backend.domain.generation.service.ScrapingService;
+import com.backend.domain.log.event.GenerationLogEvent;
 import com.backend.domain.member.entity.Member;
 import com.backend.domain.member.service.MemberService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
 
@@ -26,12 +26,17 @@ public class GenerationServiceImpl implements GenerationService {
     private final ScrapingService scrapingService;
     private final MemberService memberService;
     private final Executor taskExecutor;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Override
-    public CompletableFuture<GenerateElectronicResponse> generateSpec(String model, String specExample, String productNameExample, Member member) {
+    public CompletableFuture<GenerateElectronicResponse> generateSpec(GenerateElectronicRequest request, Member member) {
+
+        String model = request.getModelName();
+        String specExample = request.getSpecExample();
+        String productNameExample = request.getProductNameExample();
+
         CompletableFuture<Optional<String>> g2bFuture = CompletableFuture.supplyAsync(() -> scrapingService.findG2bClassificationNumber(model), taskExecutor);
         CompletableFuture<Optional<String>> countryOfOriginFuture = CompletableFuture.supplyAsync(() -> scrapingService.findCountryOfOrigin(model), taskExecutor);
-
         CompletableFuture<CertificationResponse> certFuture = aiProviderService.fetchCertification(model);
         CompletableFuture<GenerateElectronicResponse> mainSpecFuture = aiProviderService.fetchMainSpec(model, specExample, productNameExample);
 
@@ -49,15 +54,29 @@ public class GenerationServiceImpl implements GenerationService {
                     return mainSpec;
                 }, taskExecutor);
 
-        combinedFuture.whenCompleteAsync((result, throwable) -> handleCreditDeduction(member, throwable, "전자제품"), taskExecutor);
+        combinedFuture.whenCompleteAsync((result, throwable) -> {
+            handleCreditDeduction(member, throwable, "전자제품");
 
+            // 전달받은 원본 request DTO를 이벤트에 담아 발행
+            eventPublisher.publishEvent(new GenerationLogEvent(member, request, result, throwable));
+
+        }, taskExecutor);
         return combinedFuture;
     }
 
     @Override
-    public CompletableFuture<GenerateNonElectronicResponse> generateGeneralSpec(String productName, String specExample, Member member) {
+    public CompletableFuture<GenerateNonElectronicResponse> generateGeneralSpec(GenerateNonElectronicRequest request, Member member) {
+        String productName = request.getProductName();
+        String specExample = request.getSpecExample();
+
         CompletableFuture<GenerateNonElectronicResponse> future = aiProviderService.fetchGeneralSpec(productName, specExample);
-        future.whenCompleteAsync((result, throwable) -> handleCreditDeduction(member, throwable, "비전자제품"), taskExecutor);
+        future.whenCompleteAsync((result, throwable) -> {
+            handleCreditDeduction(member, throwable, "비전자제품");
+
+            // [수정] 전달받은 원본 request DTO를 이벤트에 담아 발행
+            eventPublisher.publishEvent(new GenerationLogEvent(member, request, result, throwable));
+
+        }, taskExecutor);
         return future;
     }
 
