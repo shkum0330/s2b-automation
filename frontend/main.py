@@ -42,7 +42,6 @@ class MainController:
 
         if self.access_token:
             print(f"Access Token 저장 성공: {self.access_token}")
-            # --- 수정된 부분 ---
             # 토큰을 성공적으로 받은 후에 MainWindow를 생성하고 표시
             self.show_main_window(self.access_token)
         else:
@@ -50,7 +49,6 @@ class MainController:
 
     # 로그인 창을 닫고 메인 윈도우를 표시
     def show_main_window(self, access_token):
-        # --- 수정된 부분 ---
         # MainWindow를 새로 생성하며 access_token 전달
         if self.main_win is None:
             self.main_win = MainWindow(access_token=access_token)

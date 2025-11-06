@@ -12,12 +12,11 @@ import lombok.NoArgsConstructor;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Payment extends BaseTimeEntity {
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long paymentId;
 
-    @Column(nullable = false, unique = true)
+    @Column(nullable = true, unique = true)
     private String paymentKey; // 결제의 고유 키 (승인 시 저장)
 
     @Column(nullable = false, unique = true)
