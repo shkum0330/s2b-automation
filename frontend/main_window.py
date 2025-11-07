@@ -1,14 +1,16 @@
 # main_window.py
 
 import pyperclip
+import configparser
+import os
 from PyQt5.QtWidgets import (QWidget, QLabel, QLineEdit, QTextEdit,
                              QPushButton, QVBoxLayout, QGroupBox, QGridLayout,
                              QMessageBox, QHBoxLayout, QRadioButton, QFrame,
-                             QComboBox)  # QComboBox 추가
+                             QComboBox)
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QFont
 from api_worker import ApiWorker
-from payment_window import PaymentWindow  # [새로 추가] payment_window 임포트
+from payment_window import PaymentWindow
 
 
 class MainWindow(QWidget):
@@ -16,14 +18,12 @@ class MainWindow(QWidget):
         super().__init__()
         self.access_token = access_token
         self.worker = None
-        self.payment_worker = None  # [새로 추가] 결제용 API 워커
+        self.payment_worker = None
         self.current_task_id = None
         self.polling_timer = QTimer(self)
         self.polling_timer.timeout.connect(self.check_task_status)
 
-        # [새로 추가] 토스페이먼츠 샌드박스(테스트) 클라이언트 키
-        # (주의: 실제 운영 시에는 이 키를 안전한 곳에서 불러와야 합니다)
-        self.toss_client_key = "test_ck_D5GePWvyJnrK0W0k6q8gLzN97Eoq"
+        self.toss_client_key = self.load_client_key()
 
         self.input_widgets = {}
         self.output_widgets = {}
@@ -58,7 +58,6 @@ class MainWindow(QWidget):
         self.refresh_button.setFont(default_font)
         self.refresh_button.clicked.connect(self.update_credit_display)
 
-        # --- [수정] 결제 UI 추가 ---
         self.plan_combo = QComboBox()
         self.plan_combo.setFont(default_font)
         self.plan_combo.addItem("플랜 선택", 0)  # data=0
@@ -68,14 +67,13 @@ class MainWindow(QWidget):
 
         self.payment_button = QPushButton("🚀 크레딧 충전")
         self.payment_button.setFont(default_font)
-        self.payment_button.clicked.connect(self.start_payment_request)  # [새로 추가] 클릭 시그널 연결
-        # --- [수정 끝] ---
+        self.payment_button.clicked.connect(self.start_payment_request)
 
         separator = QFrame()
         separator.setFrameShape(QFrame.VLine)
         separator.setFrameShadow(QFrame.Sunken)
 
-        separator_2 = QFrame()  # 두 번째 구분선
+        separator_2 = QFrame()
         separator_2.setFrameShape(QFrame.VLine)
         separator_2.setFrameShadow(QFrame.Sunken)
 
@@ -84,12 +82,10 @@ class MainWindow(QWidget):
         top_layout.addWidget(separator)
         top_layout.addWidget(self.credit_label)
         top_layout.addWidget(self.refresh_button)
-        top_layout.addWidget(separator_2)  # [새로 추가]
-        top_layout.addWidget(self.plan_combo)  # [새로 추가]
-        top_layout.addWidget(self.payment_button)  # [새로 추가]
+        top_layout.addWidget(separator_2)
+        top_layout.addWidget(self.plan_combo)
+        top_layout.addWidget(self.payment_button)
 
-        # ... (기존 request_group, response_group, action_group 등 UI 코드 생략) ...
-        # (main_layout에 top_layout 추가하는 부분은 이미 있으므로 수정 불필요)
         request_group = QGroupBox("서버에 보낼 정보")
         request_group.setFont(default_font)
         req_layout = QGridLayout()
@@ -186,11 +182,31 @@ class MainWindow(QWidget):
 
         self.setGeometry(300, 300, 840, 800)
 
-    # --- [새로 추가] 결제 요청 시작 메서드 ---
+    # config.ini에서 클라이언트 키를 로드하는 메서드
+    def load_client_key(self):
+        try:
+            config = configparser.ConfigParser()
+            # config.ini 파일의 절대 경로를 찾기
+            config_path = os.path.join(os.path.dirname(__file__), 'config.ini')
+            config.read(config_path)
+            # 'keys' 섹션에서 'toss_client_key' 값을 반환
+            return config['keys']['toss_client_key']
+        except Exception as e:
+            QMessageBox.critical(self, "설정 오류", f"config.ini 파일에서 키를 읽는 데 실패했습니다: {e}\n"
+                                                 f"frontend/config.ini 파일이 존재하는지, \n"
+                                                 f"[keys]\ntoss_client_key = ... \n형식인지 확인하세요.")
+            return None
+
+    # --- 결제 요청 시작 메서드 ---
     def start_payment_request(self):
-        amount = self.plan_combo.currentData()  # 콤보박스에 저장된 'data' (금액)를 가져옴
+        amount = self.plan_combo.currentData()
         if amount == 0:
             QMessageBox.warning(self, "플랜 선택", "먼저 충전할 플랜을 선택해주세요.")
+            return
+
+        # API 호출 전에 클라이언트 키가 있는지 먼저 확인
+        if not self.toss_client_key:
+            QMessageBox.critical(self, "설정 오류", "Toss 클라이언트 키가 로드되지 않았습니다. config.ini 파일을 확인하세요.")
             return
 
         self.payment_button.setEnabled(False)
@@ -205,7 +221,7 @@ class MainWindow(QWidget):
         self.payment_worker.finished.connect(self.handle_payment_request_response)
         self.payment_worker.start()
 
-    # --- [새로 추가] 결제 요청 응답 처리 메서드 ---
+    # ---결제 요청 응답 처리 메서드 ---
     def handle_payment_request_response(self, result):
         self.payment_button.setEnabled(True)
         self.payment_button.setText("🚀 크레딧 충전")
@@ -223,11 +239,11 @@ class MainWindow(QWidget):
             return
 
         # 백엔드에서 검증된 정보로 결제 창 열기
-        order_name = self.plan_combo.currentText().split('(')[0].strip()  # 예: "30일 10개 플랜"
+        order_name = self.plan_combo.currentText().split('(')[0].strip()
 
         self.open_payment_window(order_id, order_name, amount)
 
-    # --- [새로 추가] PaymentWindow 팝업 실행 메서드 ---
+    # --- PaymentWindow 팝업 실행 메서드 ---
     def open_payment_window(self, order_id, order_name, amount):
         # QWebEngineView가 포함된 PaymentWindow 대화상자 생성
         dialog = PaymentWindow(
@@ -235,20 +251,16 @@ class MainWindow(QWidget):
             order_id,
             order_name,
             amount,
-            self  # 부모 창으로 self 지정
+            self
         )
-
-        # [중요] 결제창이 성공 시그널을 보내면, 크레딧 정보를 새로고침
         dialog.payment_success.connect(self.handle_payment_success)
+        dialog.exec_()
 
-        dialog.exec_()  # 대화상자를 '모달(Modal)'로 실행 (이 창이 닫히기 전까지 main_window 제어 불가)
-
-    # --- [새로 추가] 결제 성공 시그널 처리 슬롯 ---
+    # --- 결제 성공 시그널 처리 슬롯 ---
     def handle_payment_success(self):
         QMessageBox.information(self, "결제 성공", "결제가 성공적으로 완료되었습니다. 크레딧을 새로고침합니다.")
-        self.update_credit_display()  # 기존의 크레딧 새로고침 메서드 호출
+        self.update_credit_display()
 
-    # ... (기존의 _update_ui_for_product_type, start_api_call 등 모든 메서드) ...
     def _update_ui_for_product_type(self):
         is_electronic = self.radio_electronic.isChecked()
 
@@ -331,7 +343,6 @@ class MainWindow(QWidget):
         if result.get('ok'):
             json_body = result.get('json', {})
             credit = json_body.get('credit', 'N/A')
-            # [수정] Role에 따른 일일 크레딧 표시
             role = json_body.get('role', 'FREE_USER')
             daily_count = json_body.get('dailyRequestCount', 0)
 
@@ -339,8 +350,8 @@ class MainWindow(QWidget):
                 limit_map = {'PLAN_30K': 10, 'PLAN_50K': 20, 'PLAN_100K': 50}
                 limit = limit_map.get(role, 0)
                 self.credit_label.setText(f"오늘 남은 횟수: {limit - daily_count} / {limit}")
-            else:  # FREE_USER 또는 ADMIN
-                self.credit_label.setText(f"오늘 남은 횟수: 5 / 5")  # (임시로 5/5)
+            else:
+                self.credit_label.setText(f"오늘 남은 횟수: 5 / 5")
         else:
             self.credit_label.setText("크레딧 조회 실패")
 
