@@ -17,7 +17,7 @@ spring:
     show-sql: true # 실행되는 SQL 쿼리를 로그에 출력
 
   config:
-    import: env.yml
+    import: optional:env.yml
 
 management:
   server:
