@@ -26,6 +26,14 @@ public class GlobalExceptionHandler {
                 "errors", errors
         );
     }
+
+    @ExceptionHandler(InsufficientCreditException.class)
+    @ResponseStatus(HttpStatus.FORBIDDEN)
+    public ErrorResult handleInsufficientCreditException(InsufficientCreditException ex) {
+        return new ErrorResult(HttpStatus.FORBIDDEN, ex.getMessage());
+    }
+
+
     @ExceptionHandler(GenerateApiException.class)
     @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
     public ErrorResult handleGenerateApiException(GenerateApiException ex) {

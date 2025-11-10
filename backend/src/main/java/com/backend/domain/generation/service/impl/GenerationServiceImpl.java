@@ -7,6 +7,7 @@ import com.backend.domain.generation.service.ScrapingService;
 import com.backend.domain.log.event.GenerationLogEvent;
 import com.backend.domain.member.entity.Member;
 import com.backend.domain.member.service.MemberService;
+import com.backend.global.exception.InsufficientCreditException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -30,6 +31,10 @@ public class GenerationServiceImpl implements GenerationService {
 
     @Override
     public CompletableFuture<GenerateElectronicResponse> generateSpec(GenerateElectronicRequest request, Member member) {
+
+        if (member.getCredit() <= 0) {
+            throw new InsufficientCreditException(member.getCredit());
+        }
 
         String model = request.getModelName();
         String specExample = request.getSpecExample();
@@ -66,6 +71,10 @@ public class GenerationServiceImpl implements GenerationService {
 
     @Override
     public CompletableFuture<GenerateNonElectronicResponse> generateGeneralSpec(GenerateNonElectronicRequest request, Member member) {
+        if (member.getCredit() <= 0) {
+            throw new InsufficientCreditException(member.getCredit());
+        }
+
         String productName = request.getProductName();
         String specExample = request.getSpecExample();
 
