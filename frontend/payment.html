@@ -4,31 +4,57 @@
     <meta charset="UTF-8" />
     <title>S2B 결제</title>
     <script src="https://js.tosspayments.com/v2/payment-widget"></script>
+    <style>
+      /* 팝업창에 맞게 간단한 스타일 추가 */
+      body { font-family: sans-serif; padding: 20px; background-color: #f4f7f9; }
+      #payment-widget { background-color: white; border-radius: 8px; padding: 10px; }
+      #payment-button { width: 100%; padding: 15px; font-size: 16px;
+                        background-color: #007bff; color: white; border: none;
+                        border-radius: 8px; cursor: pointer; margin-top: 15px; font-weight: bold; }
+      #payment-button:hover { background-color: #0056b3; }
+    </style>
   </head>
   <body>
     <div id="payment-widget"></div>
 
+    <button id="payment-button">결제하기</button>
+
     <script>
-      // Python으로부터 이 함수를 호출받을 예정
+      // 이 변수들은 startPayment 함수가 호출된 후에 설정됩니다.
+      let paymentWidget;
+      let orderIdGlobal;
+      let orderNameGlobal;
+
+      // payment_window.py으로부터 이 함수를 호출받음
       function startPayment(clientKey, orderId, orderName, amount) {
 
-        const paymentWidget = PaymentWidget(clientKey);
+        // 결제 위젯 초기화
+        paymentWidget = PaymentWidget(clientKey);
 
-        // 1. 결제위젯 렌더링
+        // 결제 UI 렌더링
         paymentWidget.renderPaymentMethods(
-          "#payment-widget",
+          "#payment-widget", // 렌더링할 <div>의 CSS 선택자
           { value: amount },
           { variantKey: "DEFAULT" }
         );
 
-        // 2. 결제창 띄우기
-        paymentWidget.requestPayment({
-          orderId: orderId,
-          orderName: orderName,
-          successUrl: "http://localhost:8080/api/v1/payments/success",
-          failUrl: "http://localhost:8080/api/v1/payments/fail",
-        });
+        orderIdGlobal = orderId;
+        orderNameGlobal = orderName;
       }
+
+      // "결제하기" 버튼 클릭 시 결제창 띄우기
+      document.getElementById("payment-button").addEventListener("click", function () {
+        if (paymentWidget && orderIdGlobal) {
+          paymentWidget.requestPayment({
+            orderId: orderIdGlobal,
+            orderName: orderNameGlobal,
+            successUrl: "http://localhost:8080/api/v1/payments/success",
+            failUrl: "http://localhost:8080/api/v1/payments/fail",
+          });
+        } else {
+          console.error("결제 위젯이 초기화되지 않았거나 주문 정보가 없습니다.");
+        }
+      });
     </script>
   </body>
 </html>

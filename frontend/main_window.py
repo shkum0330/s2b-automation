@@ -251,9 +251,14 @@ class MainWindow(QWidget):
             order_id,
             order_name,
             amount,
-            self
+            None  # [수정] self -> None으로 변경 (부모-자식 관계 제거)
         )
+
         dialog.payment_success.connect(self.handle_payment_success)
+
+        # [수정] 부모가 없으므로, 창이 항상 위에 표시되도록 플래그 추가
+        dialog.setWindowFlag(Qt.WindowStaysOnTopHint)
+
         dialog.exec_()
 
     # --- 결제 성공 시그널 처리 슬롯 ---
