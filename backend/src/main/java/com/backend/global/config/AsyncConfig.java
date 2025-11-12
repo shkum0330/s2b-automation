@@ -41,6 +41,12 @@ public class AsyncConfig {
         executor.setThreadNamePrefix("Log-");
         // 메인 스레드보다 우선순위를 낮춤 (1~10, 기본 5)
         executor.setThreadPriority(Thread.MIN_PRIORITY + 1);
+
+        // 종료 시 큐에 대기 중인 모든 작업을 완료할 때까지 대기
+        executor.setWaitForTasksToCompleteOnShutdown(true);
+        // 최대 대기 시간 설정 (예: 60초)
+        executor.setAwaitTerminationSeconds(60);
+
         executor.initialize();
         return executor;
     }

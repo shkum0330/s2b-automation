@@ -1,6 +1,7 @@
 package com.backend.domain.log.listener;
 
-import com.backend.domain.log.GenerationLog;
+import com.backend.domain.generation.dto.GenerateElectronicRequest;
+import com.backend.domain.log.entity.GenerationLog;
 import com.backend.domain.log.event.GenerationLogEvent;
 import com.backend.domain.log.repository.GenerationLogRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -33,6 +34,11 @@ public class GenerationLogListener {
             String responseBody = (event.getError() == null) ? convertToJson(event.getResponseDto()) : null;
             String errorMessage = (event.getError() != null) ? getRootCauseMessage(event.getError()) : null;
 
+            String modelName = null;
+            if (event.getRequestDto() instanceof GenerateElectronicRequest) {
+                modelName = ((GenerateElectronicRequest) event.getRequestDto()).getModelName();
+            }
+
             // 로그 엔티티를 빌드
             GenerationLog logEntry = GenerationLog.builder()
                     .member(event.getMember())
@@ -40,6 +46,7 @@ public class GenerationLogListener {
                     .responseBody(responseBody)
                     .success(event.getError() == null)
                     .errorMessage(errorMessage)
+                    .modelName(modelName)
                     .build();
 
             // DB에 저장
