@@ -11,26 +11,20 @@ from login_window import LoginWindow
 from main_window import MainWindow
 from api_worker import ApiWorker
 
-# --- QWebEngineView 전역 초기화 ---
-
-# 1. QApplication 생성 *전에* 속성을 설정합니다.
+# QApplication 생성 전에 속성 설정
 QApplication.setAttribute(Qt.AA_ShareOpenGLContexts)
 
-# 2. QApplication을 *먼저* 생성합니다.
+# 2. QApplication을 먼저 생성합니다.
 app = QApplication(sys.argv)
 
-# 3. (가장 중요) QApplication 생성 *후에* 전역 웹 엔진 설정을 주입합니다.
+# 3. QApplication 생성 후에 전역 웹 엔진 설정 주입
 global_settings = QtWebEngineWidgets.QWebEngineSettings.globalSettings()
 
-# [수정] JavaScriptEnabled -> JavascriptEnabled (소문자 s)
 global_settings.setAttribute(QtWebEngineWidgets.QWebEngineSettings.JavascriptEnabled, True)
-
 global_settings.setAttribute(QtWebEngineWidgets.QWebEngineSettings.LocalContentCanAccessRemoteUrls, True)
 
-# 4. 웹 엔진 프로필을 초기화합니다.
+# 4. 웹 엔진 프로필 초기화
 QtWebEngineWidgets.QWebEngineProfile.defaultProfile()
-# --- [초기화 완료] ---
-
 
 # 전체 애플리케이션의 흐름을 제어하는 메인 컨트롤러
 class MainController:
@@ -79,7 +73,6 @@ class MainController:
 
 
 if __name__ == '__main__':
-    # 앱과 설정은 이미 위에서 초기화되었습니다.
     controller = MainController()
     controller.show_login_window()
     sys.exit(app.exec_())
