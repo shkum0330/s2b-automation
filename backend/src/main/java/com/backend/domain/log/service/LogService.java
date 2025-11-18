@@ -33,7 +33,7 @@ public class LogService {
 
         Page<GenerationLog> logPage = logRepository.findAll(spec, pageable);
 
-        // 3. Page<GenerationLog> -> Page<LogSummaryDto>로 변환
+        // Page<GenerationLog> -> Page<LogSummaryDto>로 변환
         return logPage.map(LogSummaryDto::new);
     }
 
