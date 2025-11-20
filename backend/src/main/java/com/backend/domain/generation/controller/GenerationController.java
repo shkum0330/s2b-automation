@@ -35,9 +35,7 @@ public class GenerationController {
 
         // 여러 API를 호출하고 조합하는 비동기 작업
         CompletableFuture<GenerateElectronicResponse> future = generationService.generateSpec(
-                request.getModelName(),
-                request.getSpecExample(),
-                request.getProductNameExample(),
+                request,
                 memberDetails.member()
         );
 
@@ -53,8 +51,7 @@ public class GenerationController {
 
         // 단일 AI API만 호출하는 비동기 작업
         CompletableFuture<GenerateNonElectronicResponse> future = generationService.generateGeneralSpec(
-                request.getProductName(),
-                request.getSpecExample(),
+                request,
                 memberDetails.member()
         );
 

@@ -10,7 +10,7 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: update # 앱 실행 시 엔티티와 DB 스키마가 일치하는지 검증, 불일치 시 실패
+      ddl-auto: update
     properties:
       hibernate:
         format_sql: true # SQL 쿼리를 보기 좋게 포맷팅하여 로그에 출력
