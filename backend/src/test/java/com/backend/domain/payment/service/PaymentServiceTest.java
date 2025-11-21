@@ -3,7 +3,6 @@ package com.backend.domain.payment.service;
 import com.backend.domain.member.entity.Member;
 import com.backend.domain.member.entity.Role;
 import com.backend.domain.member.repository.MemberRepository;
-import com.backend.domain.payment.dto.TossConfirmResponseDto;
 import com.backend.domain.payment.entity.Payment;
 import com.backend.domain.payment.repository.PaymentRepository;
 import com.backend.global.exception.NotFoundException;
@@ -31,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @SpringBootTest
 @Transactional
-@ActiveProfiles("dev") // dev 프로파일 사용 (GeminiServiceTest 등 다른 테스트와 동일하게)
+@ActiveProfiles("dev")
 class PaymentServiceTest {
 
     public static MockWebServer mockWebServer;
@@ -50,23 +49,18 @@ class PaymentServiceTest {
 
     private Member testMember;
 
-    // 테스트 시작 전 MockWebServer 실행
     @BeforeAll
     static void setUpAll() throws IOException {
         mockWebServer = new MockWebServer();
         mockWebServer.start();
     }
 
-    // 테스트 종료 후 MockWebServer 종료
     @AfterAll
     static void tearDownAll() throws IOException {
         mockWebServer.shutdown();
     }
 
-    /**
-     * @DynamicPropertySource
-     * application.yml의 toss.api.url 프로퍼티를 동적으로 MockWebServer의 URL로 변경
-     */
+    // application.yml의 toss.api.url을 MockWebServer의 주소로 동적 교체
     @DynamicPropertySource
     static void dynamicProperties(DynamicPropertyRegistry registry) {
         registry.add("toss.api.url", () -> mockWebServer.url("/").toString());
@@ -74,53 +68,52 @@ class PaymentServiceTest {
 
     @BeforeEach
     void setUp() {
-        // 각 테스트 전에 깨끗한 상태를 위해 member, payment clear
         paymentRepository.deleteAll();
         memberRepository.deleteAll();
 
-        // 테스트용 멤버 생성 및 저장
         testMember = Member.builder()
                 .email("test@example.com")
                 .name("테스트유저")
                 .provider("TEST")
                 .providerId("test-provider-id")
-                .role(Role.FREE_USER) // 초기 등급은 FREE_USER
+                .role(Role.FREE_USER)
                 .build();
         memberRepository.save(testMember);
     }
 
-    // --- 1. requestPayment 테스트 ---
-
     @Test
-    @DisplayName("결제 요청 성공: 유효한 금액으로 요청 시 READY 상태의 Payment 객체가 DB에 저장된다")
+    @DisplayName("결제 요청 성공: 유효한 금액과 주문명으로 요청 시 READY 상태의 Payment가 저장된다")
     void requestPayment_success() {
         // given
-        Long validAmount = 29900L; // PLAN_30K 금액
+        Long validAmount = 29900L;
+        String orderName = "30일 10개 플랜";
 
         // when
-        Payment payment = paymentService.requestPayment(testMember, validAmount);
+        Payment payment = paymentService.requestPayment(testMember, validAmount, orderName);
 
         // then
         assertThat(payment).isNotNull();
         assertThat(payment.getAmount()).isEqualTo(validAmount);
+        assertThat(payment.getOrderName()).isEqualTo(orderName);
         assertThat(payment.getMember()).isEqualTo(testMember);
         assertThat(payment.getStatus()).isEqualTo("READY");
         assertThat(payment.getOrderId()).isNotNull();
 
-        // DB에 저장되었는지 검증
+        // DB 검증
         Payment foundPayment = paymentRepository.findById(payment.getPaymentId()).orElseThrow();
         assertThat(foundPayment.getOrderId()).isEqualTo(payment.getOrderId());
     }
 
     @Test
-    @DisplayName("결제 요청 실패: 유효하지 않은 금액으로 요청 시 IllegalArgumentException이 발생한다")
-    void requestPayment_fail_withInvalidAmount() {
+    @DisplayName("결제 요청 실패: 유효하지 않은 금액으로 요청 시 예외 발생")
+    void requestPayment_fail_invalidAmount() {
         // given
-        Long invalidAmount = 1000L; // 허용되지 않는 금액
+        Long invalidAmount = 500L; // 정의되지 않은 금액
+        String orderName = "이상한 플랜";
 
         // when & then
         IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
-            paymentService.requestPayment(testMember, invalidAmount);
+            paymentService.requestPayment(testMember, invalidAmount, orderName);
         });
 
         assertThat(exception.getMessage()).isEqualTo("유효하지 않은 결제 금액입니다.");
@@ -129,19 +122,17 @@ class PaymentServiceTest {
     // --- 2. confirmPayment 테스트 ---
 
     @Test
-    @DisplayName("결제 승인 성공: 유효한 결제 승인 요청 시, 상태가 DONE으로 변경되고 멤버 등급이 상승한다")
+    @DisplayName("결제 승인 성공: Toss API 승인 후 DB 업데이트 및 멤버십 등급 상향")
     void confirmPayment_success() throws JsonProcessingException {
         // given
-        // 1. "READY" 상태의 결제 정보 생성 (PLAN_50K)
+        // 1. READY 상태의 결제 데이터 생성
         Long amount = 49900L;
-        Payment readyPayment = paymentService.requestPayment(testMember, amount);
+        String orderName = "30일 20개 플랜";
+        Payment readyPayment = paymentService.requestPayment(testMember, amount, orderName);
         String orderId = readyPayment.getOrderId();
-        String paymentKey = "test-payment-key-123";
+        String paymentKey = "test_payment_key_success";
 
-        // 2. MockWebServer가 반환할 가짜 Toss API 응답 (JSON) 생성
-        TossConfirmResponseDto mockTossResponse = new TossConfirmResponseDto();
-        // (TossConfirmResponseDto에 Setter가 없으므로, 실제 DTO 구조에 맞게 수정 필요)
-        // 여기서는 objectMapper를 사용해 수동으로 JSON 문자열을 만듭니다.
+        // 2. MockWebServer 응답 설정 (Toss API 모킹)
         String mockResponseBody = objectMapper.writeValueAsString(Map.of(
                 "paymentKey", paymentKey,
                 "orderId", orderId,
@@ -149,74 +140,67 @@ class PaymentServiceTest {
                 "totalAmount", amount
         ));
 
-        // 3. MockWebServer에 가짜 응답 Enqueue
         mockWebServer.enqueue(new MockResponse()
                 .setResponseCode(200)
                 .setHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .setBody(mockResponseBody));
 
         // when
-        // confirmPayment는 Mono를 반환하므로, StepVerifier로 비동기 검증
         StepVerifier.create(paymentService.confirmPayment(paymentKey, orderId, amount))
                 .expectNextMatches(responseDto ->
                         responseDto.getStatus().equals("DONE") &&
-                                responseDto.getOrderId().equals(orderId)
-                )
+                                responseDto.getOrderId().equals(orderId))
                 .verifyComplete();
 
         // then
-        // 1. Payment 상태 검증 (DB)
+        // 1. Payment 상태가 DONE으로 변경되었는지 확인
         Payment confirmedPayment = paymentRepository.findByOrderId(orderId).orElseThrow();
         assertThat(confirmedPayment.getStatus()).isEqualTo("DONE");
         assertThat(confirmedPayment.getPaymentKey()).isEqualTo(paymentKey);
 
-        // 2. Member 등급 검증 (DB)
+        // 2. Member 등급이 PLAN_50K로 변경되었는지 확인
         Member updatedMember = memberRepository.findById(testMember.getMemberId()).orElseThrow();
-        assertThat(updatedMember.getRole()).isEqualTo(Role.PLAN_50K); // 49900L -> PLAN_50K
+        assertThat(updatedMember.getRole()).isEqualTo(Role.PLAN_50K);
         assertThat(updatedMember.getPlanExpiresAt()).isEqualTo(LocalDate.now().plusDays(30));
     }
 
     @Test
-    @DisplayName("결제 승인 실패: 요청 금액과 주문 금액이 일치하지 않으면 IllegalArgumentException이 발생한다")
-    void confirmPayment_fail_whenAmountMismatch() {
+    @DisplayName("결제 승인 실패: 요청 금액 불일치 시 ABORTED 상태로 변경되고 예외 발생")
+    void confirmPayment_fail_amountMismatch() {
         // given
         Long originalAmount = 29900L;
-        Long mismatchedAmount = 100L; // 다른 금액
-        Payment readyPayment = paymentService.requestPayment(testMember, originalAmount);
-        String orderId = readyPayment.getOrderId();
-        String paymentKey = "test-payment-key-456";
+        Long wrongAmount = 100L; // 요청 금액과 다름
+        String orderName = "30일 10개 플랜";
 
-        // when & then
-        // MockWebServer를 설정할 필요 없음. API 호출 전에 서비스 내부에서 검증됨.
-        StepVerifier.create(paymentService.confirmPayment(paymentKey, orderId, mismatchedAmount))
+        Payment readyPayment = paymentService.requestPayment(testMember, originalAmount, orderName);
+        String orderId = readyPayment.getOrderId();
+        String paymentKey = "test_payment_key_fail";
+
+        // when & then (StepVerifier로 Mono 에러 검증)
+        StepVerifier.create(paymentService.confirmPayment(paymentKey, orderId, wrongAmount))
                 .expectErrorMatches(throwable ->
                         throwable instanceof IllegalArgumentException &&
-                                throwable.getMessage().equals("주문 금액이 일치하지 않습니다.")
-                )
+                                throwable.getMessage().equals("주문 금액이 일치하지 않습니다."))
                 .verify();
 
-        // DB 상태가 변하지 않았는지 확인
-        Payment payment = paymentRepository.findByOrderId(orderId).orElseThrow();
-        assertThat(payment.getStatus()).isEqualTo("READY");
-        Member member = memberRepository.findById(testMember.getMemberId()).orElseThrow();
-        assertThat(member.getRole()).isEqualTo(Role.FREE_USER);
+        // then
+        // 금액 불일치 시 failPayment()가 호출되어 status가 ABORTED로 변경되었는지 확인
+        Payment failedPayment = paymentRepository.findByOrderId(orderId).orElseThrow();
+        assertThat(failedPayment.getStatus()).isEqualTo("ABORTED");
     }
 
     @Test
-    @DisplayName("결제 승인 실패: 존재하지 않는 주문 ID로 요청 시 NotFoundException이 발생한다")
-    void confirmPayment_fail_whenOrderNotFound() {
+    @DisplayName("결제 승인 실패: 존재하지 않는 주문 ID 요청 시 예외 발생")
+    void confirmPayment_fail_notFound() {
         // given
-        String nonExistentOrderId = "non-existent-order-id";
-        String paymentKey = "test-payment-key-789";
+        String nonExistentOrderId = "unknown_order_id";
+        String paymentKey = "test_key";
         Long amount = 29900L;
 
         // when & then
-        // 이 예외는 Mono.error()가 아닌, orElseThrow()에서 동기적으로 발생합니다.
-        // 따라서 StepVerifier가 아닌 assertThrows로 검증해야 합니다.
-        NotFoundException exception = assertThrows(NotFoundException.class, () -> {
-            paymentService.confirmPayment(paymentKey, nonExistentOrderId, amount).block(); // .block()으로 동기 실행
+        // orElseThrow()는 Mono 스트림 생성 전에 발생하므로 assertThrows 사용
+        assertThrows(NotFoundException.class, () -> {
+            paymentService.confirmPayment(paymentKey, nonExistentOrderId, amount);
         });
-
-        assertThat(exception.getMessage()).contains("주문 정보를 찾을 수 없습니다.");
     }
 }

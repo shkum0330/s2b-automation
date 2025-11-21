@@ -7,5 +7,5 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class PaymentRequestDto {
     private Long amount;
-    // todo: 필요시 orderName 등 추가
+    private String orderName;
 }

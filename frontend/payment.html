@@ -20,29 +20,49 @@
     <button id="payment-button">결제하기</button>
 
     <script>
-      // 이 변수들은 startPayment 함수가 호출된 후에 설정됩니다.
       let paymentWidget;
       let orderIdGlobal;
       let orderNameGlobal;
+      // [수정] TossPayments 메인 객체를 저장할 변수
+      let tossPayments;
 
       // payment_window.py으로부터 이 함수를 호출받음
       function startPayment(clientKey, orderId, orderName, amount) {
 
-        // 결제 위젯 초기화
-        paymentWidget = PaymentWidget(clientKey);
+        // [수정] 1. (1단계) TossPayments 메인 객체 초기화
+        tossPayments = TossPayments(clientKey);
 
-        // 결제 UI 렌더링
-        paymentWidget.renderPaymentMethods(
-          "#payment-widget", // 렌더링할 <div>의 CSS 선택자
-          { value: amount },
-          { variantKey: "DEFAULT" }
-        );
+        // [수정] 2. (2단계) 위젯 객체 생성
+        //    customerKey는 필수이며, 비회원 결제를 위해 SDK의 ANONYMOUS 상수를 사용합니다.
+        paymentWidget = tossPayments.widgets({
+          customerKey: TossPayments.ANONYMOUS
+        });
 
+        // [수정] 3. (3단계) 금액 설정 -> 렌더링 (Promise 순서 보장)
+        //    setAmount()가 renderPaymentMethods()보다 *먼저* 호출되어야 합니다.
+        paymentWidget.setAmount({ value: amount })
+          .then(() => {
+            // 4. (4단계) UI 렌더링
+            return paymentWidget.renderPaymentMethods(
+              "#payment-widget", // 렌더링할 <div>의 CSS 선택자
+              { variantKey: "DEFAULT" }
+            );
+          })
+          .then(() => {
+            console.log("V2 위젯 렌더링 성공");
+          })
+          .catch((error) => {
+            // 렌더링 실패 (클라이언트 키 오류, 금액 < 100원 오류 등)
+            console.error("V2 위젯 렌더링 실패:", error);
+            alert("결제 위젯을 불러오는 데 실패했습니다: " + error.message);
+          });
+
+        // 5. 주문 정보 저장 (버튼 클릭 시 사용)
         orderIdGlobal = orderId;
         orderNameGlobal = orderName;
       }
 
-      // "결제하기" 버튼 클릭 시 결제창 띄우기
+      // "결제하기" 버튼 클릭 시 (이 로직은 기존과 동일)
       document.getElementById("payment-button").addEventListener("click", function () {
         if (paymentWidget && orderIdGlobal) {
           paymentWidget.requestPayment({

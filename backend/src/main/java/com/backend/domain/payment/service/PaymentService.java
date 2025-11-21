@@ -29,6 +29,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 @Transactional
 public class PaymentService {
+
     private final PaymentRepository paymentRepository;
     private final MemberRepository memberRepository;
     private final WebClient.Builder webClientBuilder;
@@ -40,12 +41,11 @@ public class PaymentService {
     private String tossApiUrl;
 
     private WebClient tossWebClient;
-    private static final int SUBSCRIPTION_DAYS = 30; // 구독 일수
+    private static final int SUBSCRIPTION_DAYS = 30;
 
     @PostConstruct
     public void init() {
         String basicAuth = Base64.getEncoder().encodeToString((tossSecretKey + ":").getBytes(StandardCharsets.UTF_8));
-
         this.tossWebClient = webClientBuilder
                 .baseUrl(tossApiUrl)
                 .defaultHeader(HttpHeaders.AUTHORIZATION, "Basic " + basicAuth)
@@ -53,34 +53,33 @@ public class PaymentService {
                 .build();
     }
 
-    /**
-     * 1. 결제 요청 (DB에 READY 상태로 저장)
-     */
-    public Payment requestPayment(Member member, Long amount) {
+    public Payment requestPayment(Member member, Long amount, String orderName) {
         if (!isValidAmount(amount)) {
             throw new IllegalArgumentException("유효하지 않은 결제 금액입니다.");
         }
 
         String orderId = UUID.randomUUID().toString();
+
         Payment payment = Payment.builder()
                 .member(member)
                 .amount(amount)
+                .orderName(orderName) // [추가]
                 .orderId(orderId)
-                .paymentKey(null) // 승인 전
+                .paymentKey(null) // 아직 승인 전이므로 null
                 .status("READY")
                 .build();
+
         return paymentRepository.save(payment);
     }
 
-    /**
-     * 2. 결제 승인 (POST /v1/payments/confirm)
-     */
     public Mono<TossConfirmResponseDto> confirmPayment(String paymentKey, String orderId, Long amount) {
 
         Payment payment = paymentRepository.findByOrderId(orderId)
-                .orElseThrow(() -> new NotFoundException("주문 정보를 찾을 수 없습니다. (orderId: " + orderId + ")"));
+                .orElseThrow(() -> new NotFoundException("주문 정보를 찾을 수 없습니다. orderId=" + orderId));
 
+        // 금액 검증
         if (!Objects.equals(payment.getAmount(), amount)) {
+            payment.failPayment(); // 금액 불일치 시 결제 중단 처리
             return Mono.error(new IllegalArgumentException("주문 금액이 일치하지 않습니다."));
         }
 
@@ -90,51 +89,46 @@ public class PaymentService {
                 "amount", amount
         );
 
+        // 승인 API 호출
         return tossWebClient.post()
                 .uri("/v1/payments/confirm")
-                .header("Idempotency-Key", orderId) // 멱등성 키 추가
                 .bodyValue(body)
                 .retrieve()
                 .bodyToMono(TossConfirmResponseDto.class)
                 .doOnSuccess(response -> {
-                    if ("DONE".equals(response.getStatus())) {
+                    if (response != null && "DONE".equals(response.getStatus())) {
                         handleSuccessfulPayment(payment, response);
-                    } else {
-                        log.warn("결제 승인은 되었으나 상태가 DONE이 아님: {}", response.getStatus());
                     }
                 })
                 .doOnError(error -> {
-                    log.error("결제 승인 API 호출 실패: {}", error.getMessage());
+                    log.error("결제 승인 실패: {}", error.getMessage());
+                    // 필요하다면 여기서 결제 실패 상태로 업데이트
                 });
     }
 
-    /**
-     * 3. 결제 성공 후속 처리 (DB 업데이트 및 멤버십 적용)
-     */
     private void handleSuccessfulPayment(Payment payment, TossConfirmResponseDto response) {
-
+        // 결제 정보 업데이트
         payment.completePayment(response.getPaymentKey());
 
+        // 멤버십 적용
         Member member = payment.getMember();
         Long amount = payment.getAmount();
+        Role newRole = getRoleByAmount(amount);
 
-        Role newRole;
-        if (amount == 29900L) {
-            newRole = Role.PLAN_30K;
-        } else if (amount == 49900L) {
-            newRole = Role.PLAN_50K;
-        } else if (amount == 99000L) {
-            newRole = Role.PLAN_100K;
-        } else {
-            log.warn("handleSuccessfulPayment: 유효하지 않은 금액 {}이 승인 처리되었습니다.", amount);
-            return;
+        if (newRole != null) {
+            member.updateMembership(newRole, SUBSCRIPTION_DAYS);
+            memberRepository.save(member);
+            log.info("결제 성공: 사용자(ID={}) 등급이 {}로 변경되었습니다.", member.getMemberId(), newRole);
         }
-
-        member.updateMembership(newRole, SUBSCRIPTION_DAYS);
-        memberRepository.save(member);
     }
 
-    // 유효한 플랜 금액인지 확인하는 헬퍼 메서드
+    private Role getRoleByAmount(Long amount) {
+        if (amount == 29900L) return Role.PLAN_30K;
+        if (amount == 49900L) return Role.PLAN_50K;
+        if (amount == 100000L) return Role.PLAN_100K;
+        return null;
+    }
+
     private boolean isValidAmount(Long amount) {
         return amount == 29900L || amount == 49900L || amount == 100000L;
     }

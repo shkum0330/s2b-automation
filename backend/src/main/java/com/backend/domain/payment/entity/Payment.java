@@ -12,30 +12,35 @@ import lombok.NoArgsConstructor;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Payment extends BaseTimeEntity {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long paymentId;
 
-    @Column(nullable = true, unique = true)
-    private String paymentKey; // 결제의 고유 키 (승인 시 저장)
+    @Column(unique = true)
+    private String paymentKey;
 
     @Column(nullable = false, unique = true)
-    private String orderId; // 주문 ID
+    private String orderId;
 
     @Column(nullable = false)
-    private Long amount; // 결제 금액
+    private String orderName; // 주문명 (예: "30일 10개 플랜")
 
     @Column(nullable = false)
-    private String status; // 결제 상태 (READY, DONE, CANCELED 등)
+    private Long amount;
+
+    @Column(nullable = false)
+    private String status; // READY, DONE, CANCELED, ABORTED
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "member_id", nullable = false)
-    private Member member; // 결제를 요청한 회원
+    private Member member;
 
     @Builder
-    public Payment(String paymentKey, String orderId, Long amount, String status, Member member) {
+    public Payment(String paymentKey, String orderId, String orderName, Long amount, String status, Member member) {
         this.paymentKey = paymentKey;
         this.orderId = orderId;
+        this.orderName = orderName;
         this.amount = amount;
         this.status = status;
         this.member = member;
@@ -44,5 +49,9 @@ public class Payment extends BaseTimeEntity {
     public void completePayment(String paymentKey) {
         this.paymentKey = paymentKey;
         this.status = "DONE";
+    }
+
+    public void failPayment() {
+        this.status = "ABORTED";
     }
 }

@@ -23,9 +23,7 @@ public class PaymentController {
 
     private final PaymentService paymentService;
 
-    /**
-     * 1. 결제 요청 (주문 생성)
-     */
+    // 결제 요청 (주문 생성)
     @PostMapping("/request")
     public ResponseEntity<?> requestPayment(
             @AuthenticationPrincipal MemberDetails memberDetails,
@@ -36,20 +34,19 @@ public class PaymentController {
         }
         try {
             Member member = memberDetails.member();
-            Payment payment = paymentService.requestPayment(member, requestDto.getAmount());
+            Payment payment = paymentService.requestPayment(member, requestDto.getAmount(), requestDto.getOrderName());
 
             return ResponseEntity.ok(Map.of(
                     "orderId", payment.getOrderId(),
-                    "amount", payment.getAmount()
+                    "amount", payment.getAmount(),
+                    "orderName", payment.getOrderName()
             ));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
         }
     }
 
-    /**
-     * 2. 결제 승인 (Toss 리다이렉트 URL)
-     */
+    // 결제 승인
     @GetMapping("/success")
     public Mono<ResponseEntity<Map<String, Object>>> successPayment(
             @RequestParam String paymentKey,
@@ -81,9 +78,7 @@ public class PaymentController {
                 });
     }
 
-    /**
-     * 3. 결제 실패 (Toss 리다이렉트 URL)
-     */
+    // 결제 실패
     @GetMapping("/fail")
     public ResponseEntity<?> failPayment(
             @RequestParam String code,
@@ -91,9 +86,9 @@ public class PaymentController {
             @RequestParam String orderId
     ) {
         log.warn("결제 실패: [Code: {}] [Message: {}] [OrderId: {}]", code, message, orderId);
-
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
                 "message", "결제에 실패했습니다: " + message,
+                "code", code,
                 "orderId", orderId
         ));
     }
