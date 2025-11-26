@@ -24,58 +24,63 @@ import java.util.List;
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
 public class LogService {
-    private final GenerationLogRepository logRepository;
+    private final GenerationLogRepository generationLogRepository;
 
-    // 로그 목록을 동적 검색 조건으로 페이징 조회
-    public Page<LogSummaryDto> searchLogs(LogSearchRequest searchRequest, Pageable pageable) {
-        // Specification(동적 쿼리) 생성
-        Specification<GenerationLog> spec = createSpecification(searchRequest);
+    public Page<LogSummaryDto> searchLogs(LogSearchRequest request, Pageable pageable) {
+        Specification<GenerationLog> spec = (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
 
-        Page<GenerationLog> logPage = logRepository.findAll(spec, pageable);
+            if (StringUtils.hasText(request.getMemberEmail())) {
+                Join<GenerationLog, Member> memberJoin = root.join("member");
+                predicates.add(cb.like(memberJoin.get("email"), "%" + request.getMemberEmail() + "%"));
+            }
+            if (request.getSuccess() != null) {
+                predicates.add(cb.equal(root.get("success"), request.getSuccess()));
+            }
+            // 날짜 검색 등 추가 가능
 
-        // Page<GenerationLog> -> Page<LogSummaryDto>로 변환
-        return logPage.map(LogSummaryDto::new);
+            query.orderBy(cb.desc(root.get("createdAt")));
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
+
+        return generationLogRepository.findAll(spec, pageable).map(LogSummaryDto::new);
     }
 
-    // 로그 상세 조회 (Full JSON 포함)
-    public LogDetailDto getLogDetail(Long generationLogId) {
-        GenerationLog log = logRepository.findById(generationLogId)
-                .orElseThrow(() -> NotFoundException.entityNotFound("Generation Log"));
+    public LogDetailDto getLogDetail(Long id) {
+        GenerationLog log = generationLogRepository.findById(id)
+                .orElseThrow(() -> NotFoundException.entityNotFound("Log not found"));
         return new LogDetailDto(log);
     }
 
     // LogSearchRequest를 기반으로 JPA Specification 객체를 생성
     private Specification<GenerationLog> createSpecification(LogSearchRequest search) {
+        // Specification 인터페이스는 하나의 메서드(toPredicate)를 가진 함수형 인터페이스입니다.
+        // root: 조회할 엔티티(GenerationLog 테이블)
+        // query: 쿼리 자체 (ORDER BY 등을 설정)
+        // cb (CriteriaBuilder): 조건문(WHERE, LIKE, EQUAL 등)을 만드는 공장
         return (root, query, cb) -> {
+
+            // 1. 조건들을 담을 리스트 생성
             List<Predicate> predicates = new ArrayList<>();
 
-            // Member(Join) - Email 검색
+            // 2. 동적 조건 추가: "사용자가 이메일 검색어를 입력했다면?"
             if (StringUtils.hasText(search.getMemberEmail())) {
+                // SQL: JOIN member m ON log.member_id = m.id WHERE m.email LIKE '%검색어%'
                 Join<GenerationLog, Member> memberJoin = root.join("member");
                 predicates.add(cb.like(memberJoin.get("email"), "%" + search.getMemberEmail() + "%"));
             }
 
-            // ModelName 검색
-            if (StringUtils.hasText(search.getModelName())) {
-                predicates.add(cb.like(root.get("modelName"), "%" + search.getModelName() + "%"));
-            }
-
-            // 성공/실패 여부 검색
+            // 3. 동적 조건 추가: "성공/실패 여부를 선택했다면?"
             if (search.getSuccess() != null) {
+                // SQL: WHERE success = true (또는 false)
                 predicates.add(cb.equal(root.get("success"), search.getSuccess()));
             }
 
-            // 날짜 범위 검색
-            if (search.getStartDate() != null) {
-                predicates.add(cb.greaterThanOrEqualTo(root.get("createdAt"), search.getStartDate().atStartOfDay()));
-            }
-            if (search.getEndDate() != null) {
-                predicates.add(cb.lessThanOrEqualTo(root.get("createdAt"), search.getEndDate().plusDays(1).atStartOfDay()));
-            }
-
-            // 정렬 순서 기본값: 최신순
+            // 4. 정렬 조건 설정 (최신순)
             query.orderBy(cb.desc(root.get("createdAt")));
 
+            // 5. 모든 조건을 AND로 묶어서 반환
+            // SQL: WHERE 조건1 AND 조건2 AND ...
             return cb.and(predicates.toArray(new Predicate[0]));
         };
     }
