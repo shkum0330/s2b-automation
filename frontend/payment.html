@@ -3,66 +3,89 @@
   <head>
     <meta charset="UTF-8" />
     <title>S2B 결제</title>
-    <script src="https://js.tosspayments.com/v2/payment-widget"></script>
     <style>
-      /* 팝업창에 맞게 간단한 스타일 추가 */
       body { font-family: sans-serif; padding: 20px; background-color: #f4f7f9; }
-      #payment-widget { background-color: white; border-radius: 8px; padding: 10px; }
+      .widget-container { background-color: white; border-radius: 8px; padding: 10px; margin-bottom: 10px; }
       #payment-button { width: 100%; padding: 15px; font-size: 16px;
                         background-color: #007bff; color: white; border: none;
-                        border-radius: 8px; cursor: pointer; margin-top: 15px; font-weight: bold; }
+                        border-radius: 8px; cursor: pointer; margin-top: 10px; font-weight: bold; }
       #payment-button:hover { background-color: #0056b3; }
+      /* 로딩 중일 때 버튼 비활성화 스타일 */
+      #payment-button:disabled { background-color: #ccc; cursor: not-allowed; }
     </style>
+
+    <script src="https://js.tosspayments.com/v2/payment-widget"></script>
   </head>
   <body>
-    <div id="payment-widget"></div>
-
+    <div id="payment-widget" class="widget-container"></div>
+    <div id="agreement" class="widget-container"></div>
     <button id="payment-button">결제하기</button>
 
     <script>
       let paymentWidget;
       let orderIdGlobal;
       let orderNameGlobal;
-      // [수정] TossPayments 메인 객체를 저장할 변수
       let tossPayments;
+      let retryCount = 0;
+      const MAX_RETRY = 50; // 최대 5초 대기 (100ms * 50)
 
-      // payment_window.py으로부터 이 함수를 호출받음
       function startPayment(clientKey, orderId, orderName, amount) {
+        // [핵심] SDK가 로드되었는지 확인
+        if (typeof TossPayments === 'undefined') {
+          if (retryCount < MAX_RETRY) {
+            console.log("SDK 로딩 대기 중... (" + retryCount + ")");
+            retryCount++;
+            // 0.1초 뒤에 다시 시도
+            setTimeout(function() {
+              startPayment(clientKey, orderId, orderName, amount);
+            }, 100);
+            return;
+          } else {
+            alert("인터넷 연결이 불안정하거나 Toss SDK를 불러올 수 없습니다.");
+            return;
+          }
+        }
 
-        // [수정] 1. (1단계) TossPayments 메인 객체 초기화
-        tossPayments = TossPayments(clientKey);
+        // SDK 로드 완료됨 -> 로직 시작
+        try {
+          tossPayments = TossPayments(clientKey);
 
-        // [수정] 2. (2단계) 위젯 객체 생성
-        //    customerKey는 필수이며, 비회원 결제를 위해 SDK의 ANONYMOUS 상수를 사용합니다.
-        paymentWidget = tossPayments.widgets({
-          customerKey: TossPayments.ANONYMOUS
-        });
-
-        // [수정] 3. (3단계) 금액 설정 -> 렌더링 (Promise 순서 보장)
-        //    setAmount()가 renderPaymentMethods()보다 *먼저* 호출되어야 합니다.
-        paymentWidget.setAmount({ value: amount })
-          .then(() => {
-            // 4. (4단계) UI 렌더링
-            return paymentWidget.renderPaymentMethods(
-              "#payment-widget", // 렌더링할 <div>의 CSS 선택자
-              { variantKey: "DEFAULT" }
-            );
-          })
-          .then(() => {
-            console.log("V2 위젯 렌더링 성공");
-          })
-          .catch((error) => {
-            // 렌더링 실패 (클라이언트 키 오류, 금액 < 100원 오류 등)
-            console.error("V2 위젯 렌더링 실패:", error);
-            alert("결제 위젯을 불러오는 데 실패했습니다: " + error.message);
+          paymentWidget = tossPayments.widgets({
+            customerKey: TossPayments.ANONYMOUS
           });
 
-        // 5. 주문 정보 저장 (버튼 클릭 시 사용)
-        orderIdGlobal = orderId;
-        orderNameGlobal = orderName;
+          paymentWidget.setAmount({
+              currency: "KRW",
+              value: amount
+          })
+          .then(() => {
+              return paymentWidget.renderPaymentMethods(
+                "#payment-widget",
+                { variantKey: "DEFAULT" }
+              );
+          })
+          .then(() => {
+              return paymentWidget.renderAgreement(
+                  "#agreement",
+                  { variantKey: "AGREEMENT" }
+              );
+          })
+          .then(() => {
+              console.log("위젯 렌더링 완료");
+          })
+          .catch((error) => {
+              console.error(error);
+              alert("위젯 렌더링 실패: " + error.message);
+          });
+
+          orderIdGlobal = orderId;
+          orderNameGlobal = orderName;
+
+        } catch (e) {
+          alert("초기화 중 치명적 오류: " + e.message);
+        }
       }
 
-      // "결제하기" 버튼 클릭 시 (이 로직은 기존과 동일)
       document.getElementById("payment-button").addEventListener("click", function () {
         if (paymentWidget && orderIdGlobal) {
           paymentWidget.requestPayment({
@@ -70,9 +93,13 @@
             orderName: orderNameGlobal,
             successUrl: "http://localhost:8080/api/v1/payments/success",
             failUrl: "http://localhost:8080/api/v1/payments/fail",
+          }).catch(function (error) {
+              if (error.code !== "USER_CANCEL") {
+                alert("결제 실패: " + error.message);
+              }
           });
         } else {
-          console.error("결제 위젯이 초기화되지 않았거나 주문 정보가 없습니다.");
+          alert("결제 위젯이 아직 준비되지 않았습니다. 잠시만 기다려주세요.");
         }
       });
     </script>

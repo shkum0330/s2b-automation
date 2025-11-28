@@ -23,7 +23,7 @@ public class PaymentController {
 
     private final PaymentService paymentService;
 
-    // 결제 요청 (주문 생성)
+    // 1. 주문 생성 API
     @PostMapping("/request")
     public ResponseEntity<?> requestPayment(
             @AuthenticationPrincipal MemberDetails memberDetails,
@@ -39,14 +39,16 @@ public class PaymentController {
             return ResponseEntity.ok(Map.of(
                     "orderId", payment.getOrderId(),
                     "amount", payment.getAmount(),
-                    "orderName", payment.getOrderName()
+                    "orderName", payment.getOrderName(),
+                    "customerEmail", member.getEmail(), // 샘플 프로젝트처럼 이메일, 이름도 전달 가능
+                    "customerName", member.getName() != null ? member.getName() : "비회원"
             ));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
         }
     }
 
-    // 결제 승인
+    // 2. 결제 승인 API (Toss에서 리다이렉트되어 들어옴)
     @GetMapping("/success")
     public Mono<ResponseEntity<Map<String, Object>>> successPayment(
             @RequestParam String paymentKey,
@@ -54,31 +56,20 @@ public class PaymentController {
             @RequestParam Long amount
     ) {
         return paymentService.confirmPayment(paymentKey, orderId, amount)
-                .map(responseDto -> {
-                    ResponseEntity<Map<String, Object>> successResponse = ResponseEntity.ok(Map.of(
-                            "message", "결제가 성공적으로 완료되었습니다.",
-                            "orderId", responseDto.getOrderId(),
-                            "totalAmount", responseDto.getTotalAmount()
-                    ));
-                    return successResponse;
-                })
-                .onErrorResume(IllegalArgumentException.class, e -> {
-                    log.warn("결제 승인 실패 (IllegalArgumentException): {}", e.getMessage());
-                    ResponseEntity<Map<String, Object>> errorResponse = ResponseEntity
-                            .status(HttpStatus.BAD_REQUEST)
-                            .body(Map.of("message", e.getMessage()));
-                    return Mono.just(errorResponse);
-                })
+                .map(responseDto -> ResponseEntity.ok(Map.of(
+                        "message", "결제가 성공적으로 완료되었습니다.",
+                        "orderId", responseDto.getOrderId(),
+                        "totalAmount", responseDto.getTotalAmount()
+                )))
                 .onErrorResume(Exception.class, e -> {
-                    log.error("결제 승인 중 심각한 오류 발생", e);
-                    ResponseEntity<Map<String, Object>> errorResponse = ResponseEntity
+                    log.error("결제 승인 중 오류 발생", e);
+                    return Mono.just(ResponseEntity
                             .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                            .body(Map.of("message", "결제 승인 중 오류가 발생했습니다."));
-                    return Mono.just(errorResponse);
+                            .body(Map.of("message", "결제 승인 실패: " + e.getMessage())));
                 });
     }
 
-    // 결제 실패
+    // 3. 결제 실패 API
     @GetMapping("/fail")
     public ResponseEntity<?> failPayment(
             @RequestParam String code,
