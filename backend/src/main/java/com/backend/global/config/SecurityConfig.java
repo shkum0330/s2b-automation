@@ -56,23 +56,17 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        // 1. CSRF, CORS, 세션 관리 등 기본 설정
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .formLogin(AbstractHttpConfigurer::disable);
 
-        // 2. 요청별 권한 설정
         http
                 .authorizeHttpRequests(auth -> auth
-                        // 정적 리소스는 모두 허용
                         .requestMatchers(PathRequest.toStaticResources().atCommonLocations()).permitAll()
-
-                        // OPTIONS 메서드는 preflight 요청이므로 모두 허용
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
-                        // 인증 없이 접근을 허용할 특정 경로들
                         .requestMatchers(
                                 "/",
                                 "/index.html",
@@ -81,19 +75,27 @@ public class SecurityConfig {
                                 "/api/v1/auth/token",
                                 "/actuator/health",
                                 "/ping",
-                                "/error"
+                                "/error",
+
+                                "/confirm/**",
+                                "/issue-billing-key",
+                                "/confirm-billing",
+                                "/callback-auth",
+                                "/fail",
+
+                                // --- 정적 리소스 (HTML/JS) ---
+                                "/widget/**",        // widget 폴더 내 파일
+                                "/payment/**",       // payment 폴더 내 파일
+                                "/brandpay/**"       // brandpay 폴더 내 파일
                         ).permitAll()
 
-                        // GET 메서드로 허용할 경로들
                         .requestMatchers(HttpMethod.GET,
                                 "/api/v1/**"
                         ).permitAll()
 
-                        // 위에서 정의한 경로 외의 모든 요청은 인증 필요
                         .anyRequest().authenticated()
                 );
 
-        // 3. 커스텀 필터 추가
         http
                 .addFilterBefore(new JwtAuthenticationFilter(jwtProvider, memberDetailsService), UsernamePasswordAuthenticationFilter.class);
         return http.build();
