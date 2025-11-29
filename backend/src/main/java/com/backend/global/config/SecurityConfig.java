@@ -83,10 +83,11 @@ public class SecurityConfig {
                                 "/callback-auth",
                                 "/fail",
 
-                                // --- 정적 리소스 (HTML/JS) ---
-                                "/widget/**",        // widget 폴더 내 파일
-                                "/payment/**",       // payment 폴더 내 파일
-                                "/brandpay/**"       // brandpay 폴더 내 파일
+                                // 정적 리소스
+                                "/widget/**",
+                                "/payment/**",
+                                "/brandpay/**",
+                                "/style.css"
                         ).permitAll()
 
                         .requestMatchers(HttpMethod.GET,
