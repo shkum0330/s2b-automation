@@ -54,7 +54,6 @@ public class LogService {
 
     // LogSearchRequest를 기반으로 JPA Specification 객체를 생성
     private Specification<GenerationLog> createSpecification(LogSearchRequest search) {
-        // Specification 인터페이스는 하나의 메서드(toPredicate)를 가진 함수형 인터페이스입니다.
         // root: 조회할 엔티티(GenerationLog 테이블)
         // query: 쿼리 자체 (ORDER BY 등을 설정)
         // cb (CriteriaBuilder): 조건문(WHERE, LIKE, EQUAL 등)을 만드는 공장

@@ -1,4 +1,4 @@
-package com.backend.domain.log.controller;
+package com.backend.domain.admin.controller;
 
 import com.backend.domain.log.dto.LogDetailDto;
 import com.backend.domain.log.dto.LogSearchRequest;
