@@ -30,26 +30,28 @@ async function loadLogs(page) {
         renderPagination(response.data);
     } catch (error) {
         console.error("로그 조회 실패", error);
+        // (401, 403은 admin-common.js가 처리하므로 제외)
         if (!error.response || (error.response.status !== 401 && error.response.status !== 403)) {
             alert("데이터를 불러오지 못했습니다.");
         }
     }
 }
 
-// 2. 테이블 HTML 렌더링
+// 2. 테이블 HTML 렌더링 (메시지 컬럼 삭제됨)
 function renderTable(logs) {
     const tbody = document.getElementById("logTableBody");
     tbody.innerHTML = "";
 
     if (!logs || logs.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-5">데이터가 없습니다.</td></tr>';
+        // 컬럼 수 5개로 변경 (ID, 사용자, 모델명, 상태, 일시)
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center py-5">데이터가 없습니다.</td></tr>';
         return;
     }
 
     logs.forEach(log => {
         const badgeClass = log.success ? 'text-bg-success' : 'text-bg-danger';
         const badgeText = log.success ? '성공' : '실패';
-        const errorMsg = log.errorMessage ? log.errorMessage : '-';
+        // const errorMsg = log.errorMessage ? log.errorMessage : '-'; (더 이상 목록에 표시 안 함)
         const modelName = log.modelName || '(없음)';
 
         const row = `
@@ -58,7 +60,6 @@ function renderTable(logs) {
                 <td>${log.memberEmail}</td>
                 <td class="fw-bold">${modelName}</td>
                 <td><span class="badge ${badgeClass}">${badgeText}</span></td>
-                <td class="text-truncate" style="max-width: 250px;">${errorMsg}</td>
                 <td>${formatDate(log.createdAt)}</td>
             </tr>
         `;
