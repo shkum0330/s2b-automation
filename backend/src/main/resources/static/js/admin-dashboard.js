@@ -24,13 +24,12 @@ async function loadLogs(page) {
     };
 
     try {
-        // [중요] 백엔드 컨트롤러 경로와 일치해야 함
+        // 백엔드 컨트롤러 경로와 일치해야 함
         const response = await axios.get('/api/v1/admin/log', { params });
         renderTable(response.data.content);
         renderPagination(response.data);
     } catch (error) {
         console.error("로그 조회 실패", error);
-        // (401, 403은 admin-common.js가 처리하므로 제외)
         if (!error.response || (error.response.status !== 401 && error.response.status !== 403)) {
             alert("데이터를 불러오지 못했습니다.");
         }
