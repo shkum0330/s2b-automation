@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{admin/fragments/head :: headFragment}">
+</head>
+<body class="bg-light d-flex align-items-center justify-content-center" style="height: 100vh;">
+
+<div class="card shadow-sm text-center p-4" style="width: 100%; max-width: 400px;">
+    <div class="card-body">
+        <h1 class="h3 mb-3 fw-normal">🔒 S2B Admin</h1>
+        <p class="text-muted mb-4">관리자 계정으로 로그인하세요.</p>
+
+        <div id="login-btn-area">
+            <button class="btn btn-warning w-100 py-2 fw-bold" onclick="startKakaoLogin()">
+                <i class="bi bi-chat-fill me-2"></i> 카카오 로그인
+            </button>
+        </div>
+
+        <div id="loading-area" class="d-none">
+            <div class="spinner-border text-primary mb-3" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p>인증 정보를 확인하고 있습니다...</p>
+        </div>
+
+        <p class="mt-4 mb-3 text-muted text-small">&copy; 2025 S2B Automation</p>
+    </div>
+</div>
+
+<script th:inline="javascript">
+    /*<![CDATA[*/
+    const KAKAO_CLIENT_ID = /*[[${kakaoClientId}]]*/ 'default-key';
+    /*]]>*/
+</script>
+
+<script src="/js/admin-login.js"></script>
+
+</body>
+</html>

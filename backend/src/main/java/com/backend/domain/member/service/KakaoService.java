@@ -57,10 +57,10 @@ public class KakaoService {
     public static final String PROVIDER_KAKAO = "KAKAO";
 
     @Transactional
-    public LoginResponseDto kakaoLogin(String code, HttpServletResponse response) throws IOException {
+    public LoginResponseDto kakaoLogin(String code, String redirectUri, HttpServletResponse response) throws IOException {
         log.info("kakao redirect uri : " + kakaoRedirectUri);
         // 1. 카카오 액세스 토큰 가져오기
-        String kakaoAccessToken = getToken(code, "http://localhost:8989");
+        String kakaoAccessToken = getToken(code, redirectUri);
 
         // 2. 카카오 사용자 정보 가져오기
         KakaoUserInfoDto kakaoUserInfo = getKakaoUserInfo(kakaoAccessToken);

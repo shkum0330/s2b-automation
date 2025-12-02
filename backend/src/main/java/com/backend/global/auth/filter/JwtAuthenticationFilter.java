@@ -54,7 +54,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         // 1. 헤더에서 Access Token 추출
         String accessToken = jwtProvider.getTokenFromRequest(request, JwtProvider.AUTHORIZATION_HEADER);
-        log.debug("accessToken: {}", accessToken);
+
         // 2. 토큰이 없는 경우, 다음 필터로 위임
         if (!StringUtils.hasText(accessToken)) {
             filterChain.doFilter(request, response);
@@ -73,6 +73,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             //    필요하다면 아래 로직을 유지할 수 있습니다.
             // validateUserRole(userDetails, jwtProvider.getRoleFromToken(accessToken));
 
+            log.info("👮‍♂️ 인증 디버깅 - 사용자: {}, 권한: {}", username, userDetails.getAuthorities());
             setAuthentication(userDetails);
 
         } catch (Exception e) {

@@ -14,7 +14,7 @@ public class WebConfig implements WebMvcConfigurer {
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/api/**") // /api/로 시작하는 모든 요청에 대해
                 .allowedOriginPatterns("chrome-extension://*") // 와일드카드를 포함한 출처 패턴 허용
-                .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS") // OPTIONS 메소드 추가
+                .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                 .allowedHeaders("*")
                 .allowCredentials(false);
     }
@@ -22,11 +22,6 @@ public class WebConfig implements WebMvcConfigurer {
     @Bean
     public RestTemplate restTemplate() {
         return new RestTemplate();
-    }
-
-    @Bean
-    public ObjectMapper objectMapper() {
-        return new ObjectMapper();
     }
 
     @Bean
