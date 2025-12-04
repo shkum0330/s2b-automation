@@ -11,7 +11,7 @@ public class LogSearchRequest {
     private String modelName;
     private Boolean success;
 
-    // 날짜 범위 검색 (YYYY-MM-DD)
+    // 날짜 범위 검색
     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
     private LocalDate startDate;
 

@@ -8,7 +8,7 @@ logging:
       springframework:
         jdbc: debug
         security: info
-    com.zaxxer.hikari: debug
+#    com.zaxxer.hikari: debug
 
 kakao:
   client-id: ${KAKAO_CLIENT_ID}

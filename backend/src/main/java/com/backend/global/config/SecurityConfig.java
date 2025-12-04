@@ -56,15 +56,21 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        // 1. CSRF, CORS, 세션 관리 등 기본 설정
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .formLogin(AbstractHttpConfigurer::disable);
 
+        // 2. 요청별 권한 설정
         http
                 .authorizeHttpRequests(auth -> auth
+                        // 1. 정적 리소스 (CSS, JS, 이미지) 허용
                         .requestMatchers(PathRequest.toStaticResources().atCommonLocations()).permitAll()
+                        .requestMatchers("/css/**", "/js/**", "/images/**").permitAll() // [추가] 커스텀 정적 경로
+
+                        // 2. OPTIONS 메서드 허용
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
                         .requestMatchers(
@@ -73,27 +79,21 @@ public class SecurityConfig {
                                 "/favicon.ico",
                                 "/api/v1/auth/callback/kakao",
                                 "/api/v1/auth/token",
-                                "/actuator/health",
+                                "/actuator/**",
                                 "/ping",
                                 "/error",
-
-                                "/confirm/**",
-                                "/issue-billing-key",
-                                "/confirm-billing",
-                                "/callback-auth",
-                                "/fail",
-
-                                // 정적 리소스
-                                "/widget/**",
-                                "/payment/**",
-                                "/brandpay/**",
-                                "/style.css"
+                                "/admin/login"
                         ).permitAll()
 
-                        .requestMatchers(HttpMethod.GET,
-                                "/api/v1/**"
-                        ).permitAll()
+                        // 3. GET 요청 허용 (기존 정책 유지)
+                        .requestMatchers(HttpMethod.GET, "/api/v1/**").permitAll()
 
+                        // 4. 어드민 대시보드 페이지는 인증 필요
+                        //  todo: 엄격하게 하려면 authenticated() 후 필터 예외 처리 필요
+                        //  일단은 간편하게 모든 /admin/** 요청을 열어두고, 데이터 API에서 막음
+                        .requestMatchers("/admin/**").permitAll()
+
+                        // 그 외 모든 요청은 인증 필요
                         .anyRequest().authenticated()
                 );
 
