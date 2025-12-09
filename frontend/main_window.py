@@ -5,7 +5,7 @@ from PyQt5.QtWidgets import (QWidget, QLabel, QLineEdit, QTextEdit,
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QFont
 from api_worker import ApiWorker
-
+from config import BASE_URL
 
 class MainWindow(QWidget):
     def __init__(self, access_token=None):
@@ -190,7 +190,7 @@ class MainWindow(QWidget):
             if not model or not spec_example:
                 QMessageBox.warning(self, "입력 오류", "모델명과 규격 예시는 반드시 입력해야 합니다.")
                 return
-            url = 'http://localhost:8080/api/v1/generation/generate-spec'
+            url = f'{BASE_URL}/api/v1/generation/generate-spec'
             payload = {"model": model, "specExample": spec_example, "productNameExample": product_name_example}
         else:
             product_name = self.input_widgets['product_name_input'].text()
@@ -198,7 +198,7 @@ class MainWindow(QWidget):
             if not product_name or not spec_example:
                 QMessageBox.warning(self, "입력 오류", "물품명과 규격 예시는 반드시 입력해야 합니다.")
                 return
-            url = 'http://localhost:8080/api/v1/generation/generate-general-spec'
+            url = f'{BASE_URL}/api/v1/generation/generate-general-spec'
             payload = {"productName": product_name, "specExample": spec_example}
 
         self.run_button.setEnabled(False)
@@ -227,7 +227,7 @@ class MainWindow(QWidget):
 
     def update_credit_display(self):
         self.credit_label.setText("...새로고침 중...")
-        url = "http://localhost:8080/api/v1/members/me"
+        url = f"{BASE_URL}/api/v1/members/me"
         headers = {"Authorization": self.access_token}
         self.credit_worker = ApiWorker('GET', url, headers=headers)
         self.credit_worker.finished.connect(self.handle_credit_response)
@@ -259,7 +259,7 @@ class MainWindow(QWidget):
     def check_task_status(self):
         if not self.current_task_id:
             return
-        url = f"http://localhost:8080/api/v1/generation/result/{self.current_task_id}"
+        url = f"{BASE_URL}/api/v1/generation/result/{self.current_task_id}"
         headers = {"Authorization": self.access_token}
         self.worker = ApiWorker('GET', url, headers=headers, timeout=5)
         self.worker.finished.connect(self.handle_polling_response)
@@ -286,7 +286,7 @@ class MainWindow(QWidget):
             return
         self.polling_timer.stop()
         self.status_label.setText("상태: ❌ 작업 취소 요청 중...")
-        url = f"http://localhost:8080/api/v1/generation/cancel/{self.current_task_id}"
+        url = f"{BASE_URL}/api/v1/generation/cancel/{self.current_task_id}"
         headers = {"Authorization": self.access_token}
         self.worker = ApiWorker('POST', url, headers=headers, timeout=10)
         self.worker.finished.connect(self.handle_cancel_response)

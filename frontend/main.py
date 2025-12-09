@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import QApplication, QMessageBox
 from login_window import LoginWindow
 from main_window import MainWindow
 from api_worker import ApiWorker
-
+from config import BASE_URL
 
 # 전체 애플리케이션의 흐름을 제어하는 메인 컨트롤러
 class MainController:
@@ -25,7 +25,7 @@ class MainController:
 
     # LoginWindow에서 받은 auth_code로 백엔드에 최종 로그인 요청
     def process_login(self, auth_code):
-        url = f"http://localhost:8080/api/v1/auth/callback/kakao?code={auth_code}"
+        url = f"{BASE_URL}/api/v1/auth/callback/kakao?code={auth_code}"
         self.api_worker = ApiWorker('GET', url)
         self.api_worker.finished.connect(self.handle_login_response)
         self.api_worker.start()
