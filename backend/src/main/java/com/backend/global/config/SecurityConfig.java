@@ -87,6 +87,7 @@ public class SecurityConfig {
                                 "/widget/**",
                                 "/payment/**",
                                 "/brandpay/**"
+                                ,"/style.css"
                         ).permitAll()
                         .requestMatchers("/api/v1/payments/**").permitAll()
                         // 3. GET 요청 허용 (기존 정책 유지)
