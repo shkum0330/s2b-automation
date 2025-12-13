@@ -1,11 +1,11 @@
 import pyperclip
 from PyQt5.QtWidgets import (QWidget, QLabel, QLineEdit, QTextEdit,
                              QPushButton, QVBoxLayout, QGroupBox, QGridLayout,
-                             QMessageBox, QHBoxLayout, QRadioButton, QFrame)  # QFrame 추가
+                             QMessageBox, QHBoxLayout, QRadioButton, QFrame, QComboBox)
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QFont
 from api_worker import ApiWorker
-
+from payment_window import PaymentWindow
 
 class MainWindow(QWidget):
     def __init__(self, access_token=None):
@@ -13,6 +13,8 @@ class MainWindow(QWidget):
         self.access_token = access_token
         self.worker = None
         self.current_task_id = None
+        self.toss_client_key = None
+        self.load_client_key()  # 키 로드 시도
         self.polling_timer = QTimer(self)
         self.polling_timer.timeout.connect(self.check_task_status)
 
@@ -41,6 +43,19 @@ class MainWindow(QWidget):
         product_type_layout.addWidget(self.radio_general)
         product_type_layout.addStretch(1)
 
+        self.plan_combo = QComboBox()
+        self.plan_combo.setFont(default_font)
+        self.plan_combo.setFixedWidth(230)
+        self.plan_combo.addItem("플랜 선택", 0)
+        self.plan_combo.addItem("30일 10개 플랜 (29,900원)", 29900)
+        self.plan_combo.addItem("30일 20개 플랜 (49,900원)", 49900)
+        self.plan_combo.addItem("30일 50개 플랜 (100,000원)", 100000)
+
+        self.payment_button = QPushButton("🚀 크레딧 충전")
+        self.payment_button.setFont(default_font)
+        self.payment_button.setFixedWidth(120)
+        self.payment_button.clicked.connect(self.start_payment_request)
+
         self.credit_label = QLabel("남은 크레딧: -")
         self.credit_label.setFont(default_font)
         self.refresh_button = QPushButton("새로고침")
@@ -53,9 +68,16 @@ class MainWindow(QWidget):
         separator.setFrameShape(QFrame.VLine)  # 수직선 모양
         separator.setFrameShadow(QFrame.Sunken)  # 약간의 음영 효과
 
+        # 상단 레이아웃 구성
         top_layout = QHBoxLayout()
         top_layout.addLayout(product_type_layout)
-        top_layout.addWidget(separator)  # --- [NEW] 레이아웃에 구분선 추가 ---
+        top_layout.addWidget(separator)
+
+        # 결제 UI 배치
+        top_layout.addWidget(self.plan_combo)
+        top_layout.addWidget(self.payment_button)
+
+        top_layout.addStretch(1)
         top_layout.addWidget(self.credit_label)
         top_layout.addWidget(self.refresh_button)
 
@@ -318,3 +340,82 @@ class MainWindow(QWidget):
         text = text_widget.text() if isinstance(text_widget, QLineEdit) else text_widget.toPlainText()
         if text:
             pyperclip.copy(text)
+
+    def start_payment_request(self):
+        amount = self.plan_combo.currentData()
+        if amount == 0:
+            QMessageBox.warning(self, "플랜 선택", "먼저 충전할 플랜을 선택해주세요.")
+            return
+
+        if not self.toss_client_key:
+            QMessageBox.warning(self, "설정 오류", "Toss 클라이언트 키가 로드되지 않았습니다. config.ini 파일을 확인하세요.")
+            return
+
+        order_name = self.plan_combo.currentText().split('(')[0].strip()
+
+        self.payment_button.setEnabled(False)
+        self.payment_button.setText("주문 생성중...")
+
+        # 백엔드에 주문 생성 요청 (PaymentController: /api/v1/payments/request)
+        url = 'http://localhost:8080/api/v1/payments/request'
+        headers = {"Authorization": self.access_token, "Content-Type": "application/json"}
+        payload = {"amount": amount, "orderName": order_name}
+
+        self.payment_worker = ApiWorker('POST', url, payload=payload, headers=headers)
+        self.payment_worker.finished.connect(self.handle_payment_request_response)
+        self.payment_worker.start()
+
+    # [추가] 주문 생성 응답 처리
+    def handle_payment_request_response(self, response):
+        self.payment_button.setEnabled(True)
+        self.payment_button.setText("🚀 크레딧 충전")
+
+        if not response.get('ok'):
+            QMessageBox.critical(self, "오류", response.get('json', {}).get('message', '결제 주문 생성에 실패했습니다.'))
+            return
+
+        # 백엔드 응답 데이터 (orderId, customerKey 등)
+        data = response.get('json', {})
+        order_id = data.get('orderId')
+        order_name = data.get('orderName')
+
+        if not order_id or not order_name:
+            QMessageBox.critical(self, "오류", "백엔드로부터 주문 정보를 받아오지 못했습니다.")
+            return
+
+        # 결제창 열기 (데이터 전달)
+        self.open_payment_window(data)
+
+    def open_payment_window(self, payment_data):
+        # PaymentWindow에 백엔드 데이터와 클라이언트 키 전달
+        self.pay_win = PaymentWindow(payment_data, self.toss_client_key)
+        self.pay_win.payment_success.connect(self.handle_payment_success)
+        self.pay_win.show()
+
+    def handle_payment_success(self):
+        QMessageBox.information(self, "결제 성공", "결제가 성공적으로 완료되었습니다. 크레딧을 새로고침합니다.")
+        self.update_credit_display()
+
+    def load_client_key(self):
+        try:
+            import configparser
+            import os
+
+            config = configparser.ConfigParser()
+            # 현재 파일(main_window.py)과 같은 폴더의 config.ini를 찾음
+            config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.ini')
+
+            if not os.path.exists(config_path):
+                print(f"설정 파일 없음: {config_path}")
+                return
+
+            config.read(config_path, encoding='utf-8')
+
+            if 'keys' in config and 'toss_client_key' in config['keys']:
+                self.toss_client_key = config['keys']['toss_client_key']
+                print(f"Client Key 로드 성공: {self.toss_client_key[:5]}***")
+            else:
+                print("config.ini에 [keys] 섹션이나 toss_client_key가 없습니다.")
+
+        except Exception as e:
+            print(f"키 로드 중 오류 발생: {e}")

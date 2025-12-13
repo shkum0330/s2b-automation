@@ -1,39 +1,43 @@
-# main.py
-
+# frontend/main.py
 import sys
+import os
+import traceback
+
+
+# GPU 가속 비활성화 (QApplication 생성 전 필수)
+os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = "--disable-gpu --disable-software-rasterizer"
+
+# 숨겨진 에러를 콘솔에 출력
+def exception_hook(exctype, value, tb):
+    traceback.print_exception(exctype, value, tb) # 에러 내용 출력
+    sys.exit(1)
+
+# 위에서 정의한 함수를 시스템 예외 처리기로 등록
+sys.excepthook = exception_hook
+
 from PyQt5.QtWidgets import QApplication, QMessageBox
 from PyQt5.QtCore import Qt
-from PyQt5 import QtWebEngineWidgets  # QtWebEngineWidgets 임포트 확인
+
+# 소프트웨어 렌더링 강제
+QApplication.setAttribute(Qt.AA_UseSoftwareOpenGL)
+
+# 설정이 끝난 후에 WebEngineWidgets 임포트
+from PyQt5 import QtWebEngineWidgets
 
 from login_window import LoginWindow
 from main_window import MainWindow
 from api_worker import ApiWorker
 
-# --- QWebEngineView 전역 초기화 ---
-
-# 1. QApplication 생성 전에 속성 설정
-QApplication.setAttribute(Qt.AA_ShareOpenGLContexts)
-
-# 2. QApplication 생성
+# --- 초기화 ---
+# 설정 완료 후 앱 생성
 app = QApplication(sys.argv)
 
-# 3. 전역 웹 엔진 설정 주입
-global_settings = QtWebEngineWidgets.QWebEngineSettings.globalSettings()
+# 전역 웹 엔진 설정 (로컬 스토리지 허용 - 결제창 필수)
+default_settings = QtWebEngineWidgets.QWebEngineSettings.globalSettings()
+default_settings.setAttribute(QtWebEngineWidgets.QWebEngineSettings.JavascriptEnabled, True)
+default_settings.setAttribute(QtWebEngineWidgets.QWebEngineSettings.LocalStorageEnabled, True)
+default_settings.setAttribute(QtWebEngineWidgets.QWebEngineSettings.LocalContentCanAccessRemoteUrls, True)
 
-# [기존 설정] 자바스크립트 활성화
-global_settings.setAttribute(QtWebEngineWidgets.QWebEngineSettings.JavascriptEnabled, True)
-# [기존 설정] 로컬 파일의 리모트 접근 허용
-global_settings.setAttribute(QtWebEngineWidgets.QWebEngineSettings.LocalContentCanAccessRemoteUrls, True)
-
-# ✅ [추가] 로컬 스토리지 활성화 (이것이 없으면 결제 위젯이 뜨지 않습니다)
-global_settings.setAttribute(QtWebEngineWidgets.QWebEngineSettings.LocalStorageEnabled, True)
-
-# 4. 웹 엔진 프로필 초기화
-QtWebEngineWidgets.QWebEngineProfile.defaultProfile()
-# -------------------------------
-
-
-# (이하 MainController 및 실행 코드는 기존과 동일)
 class MainController:
     def __init__(self):
         self.login_win = LoginWindow()
@@ -61,7 +65,6 @@ class MainController:
         self.access_token = headers.get('Authorization')
 
         if self.access_token:
-            print(f"Access Token 저장 성공: {self.access_token}")
             self.show_main_window(self.access_token)
         else:
             QMessageBox.critical(self.login_win, "로그인 실패", "Access Token을 받지 못했습니다.")
@@ -72,9 +75,7 @@ class MainController:
         self.login_win.close()
         self.main_win.show()
 
-
 if __name__ == '__main__':
-    # 앱과 설정은 이미 위에서 초기화되었습니다.
     controller = MainController()
     controller.show_login_window()
     sys.exit(app.exec_())
