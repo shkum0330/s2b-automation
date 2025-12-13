@@ -63,7 +63,7 @@ class MainWindow(QWidget):
         self.refresh_button.setFont(default_font)
         self.refresh_button.clicked.connect(self.update_credit_display)
 
-        # --- [NEW] 수직 구분선 생성 ---
+        # 수직 구분선 생성
         separator = QFrame()
         separator.setFrameShape(QFrame.VLine)  # 수직선 모양
         separator.setFrameShadow(QFrame.Sunken)  # 약간의 음영 효과

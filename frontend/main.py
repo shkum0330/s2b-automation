@@ -3,10 +3,6 @@ import sys
 import os
 import traceback
 
-
-# GPU 가속 비활성화 (QApplication 생성 전 필수)
-os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = "--disable-gpu --disable-software-rasterizer"
-
 # 숨겨진 에러를 콘솔에 출력
 def exception_hook(exctype, value, tb):
     traceback.print_exception(exctype, value, tb) # 에러 내용 출력
@@ -16,23 +12,16 @@ def exception_hook(exctype, value, tb):
 sys.excepthook = exception_hook
 
 from PyQt5.QtWidgets import QApplication, QMessageBox
-from PyQt5.QtCore import Qt
-
-# 소프트웨어 렌더링 강제
-QApplication.setAttribute(Qt.AA_UseSoftwareOpenGL)
-
-# 설정이 끝난 후에 WebEngineWidgets 임포트
 from PyQt5 import QtWebEngineWidgets
 
 from login_window import LoginWindow
 from main_window import MainWindow
 from api_worker import ApiWorker
 
-# --- 초기화 ---
 # 설정 완료 후 앱 생성
 app = QApplication(sys.argv)
 
-# 전역 웹 엔진 설정 (로컬 스토리지 허용 - 결제창 필수)
+# 전역 웹 엔진 설정
 default_settings = QtWebEngineWidgets.QWebEngineSettings.globalSettings()
 default_settings.setAttribute(QtWebEngineWidgets.QWebEngineSettings.JavascriptEnabled, True)
 default_settings.setAttribute(QtWebEngineWidgets.QWebEngineSettings.LocalStorageEnabled, True)

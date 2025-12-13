@@ -8,7 +8,7 @@ class PaymentWindow(QDialog):
     payment_success = pyqtSignal()
 
     def __init__(self, payment_data, client_key):
-        super().__init__()  # [중요] 부모 클래스 초기화 필수
+        super().__init__()  # 부모 클래스 초기화 필수
         self.payment_data = payment_data
         self.client_key = client_key
         self.initUI()
@@ -43,7 +43,7 @@ class PaymentWindow(QDialog):
         customer_name = self.payment_data.get('customerName')
         customer_key = self.payment_data.get('customerKey')
 
-        # 자바스크립트 실행 (오타 주의)
+        # 자바스크립트 실행
         js_code = f"""
         initPaymentWidget(
             '{self.client_key}', 
