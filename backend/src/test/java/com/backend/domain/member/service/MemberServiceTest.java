@@ -35,7 +35,7 @@ class MemberServiceTest {
                 .name("테스트유저")
                 .provider("TEST")
                 .providerId("test-provider-id")
-                .role(Role.PAID_USER)
+                .role(Role.PLAN_30K)
                 .build();
     }
 

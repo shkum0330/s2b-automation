@@ -55,7 +55,7 @@ public class GenerationLogListener {
         } catch (Exception e) {
             // 로깅에 실패하더라도 메인 기능에 영향을 주지 않도록 예외 처리
             log.error("GenerationLog 저장 실패. Member ID: {}",
-                    event.getMember() != null ? event.getMember().getId() : "null", e);
+                    event.getMember() != null ? event.getMember().getMemberId() : "null", e);
         }
     }
 

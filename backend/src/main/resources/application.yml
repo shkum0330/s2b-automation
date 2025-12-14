@@ -17,7 +17,7 @@ spring:
     show-sql: true # 실행되는 SQL 쿼리를 로그에 출력
 
   config:
-    import: env.yml
+    import: optional:env.yml
 
 management:
   server:
@@ -52,6 +52,13 @@ chatgpt:
   api:
     url: https://api.openai.com/v1/chat/completions
     key: ${CHATGPT_API_KEY}
+
+toss:
+  client-key: ${TOSS_CLIENT_KEY}
+  secret-key: ${TOSS_SECRET_KEY}
+  widget-secret-key: ${TOSS_WIDGET_SECRET_KEY}
+  api:
+    url: https://api.tosspayments.com
 
 logging:
   level:

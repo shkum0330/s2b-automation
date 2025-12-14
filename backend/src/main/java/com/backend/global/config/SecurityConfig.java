@@ -23,6 +23,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 
 @Configuration
 @EnableWebSecurity
@@ -82,9 +83,13 @@ public class SecurityConfig {
                                 "/actuator/**",
                                 "/ping",
                                 "/error",
-                                "/admin/login"
+                                "/admin/login",
+                                "/widget/**",
+                                "/payment/**",
+                                "/brandpay/**"
+                                ,"/style.css"
                         ).permitAll()
-
+                        .requestMatchers("/api/v1/payments/**").permitAll()
                         // 3. GET 요청 허용 (기존 정책 유지)
                         .requestMatchers(HttpMethod.GET, "/api/v1/**").permitAll()
 

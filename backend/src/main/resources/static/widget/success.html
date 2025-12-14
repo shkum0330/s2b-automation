@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" type="text/css" href="/style.css" />
+    <title>결제 성공</title>
+</head>
+<body>
+<div class="wrapper">
+    <div class="box_section" style="width: 600px">
+        <img width="100px" src="https://static.toss.im/illusts/check-blue-spot-ending-frame.png" />
+        <h2>결제를 완료했어요</h2>
+        <div id="response"></div>
+    </div>
+</div>
+
+<script>
+    const urlParams = new URLSearchParams(window.location.search);
+
+    async function confirm() {
+        const requestData = {
+            paymentKey: urlParams.get("paymentKey"),
+            orderId: urlParams.get("orderId"),
+            amount: urlParams.get("amount"),
+        };
+
+        // [중요] 위젯용 승인 API 호출 (/confirm/widget)
+        const response = await fetch("/api/v1/payments/confirm/widget", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(requestData),
+        });
+
+        const json = await response.json();
+
+        if (!response.ok) {
+            throw { message: json.message, code: json.code };
+        }
+        return json;
+    }
+
+    confirm()
+        .then(function (data) {
+            // 성공 시 화면 표시
+            document.getElementById("response").innerHTML =
+                `<p>주문번호: ${data.orderId}</p><p>총 결제금액: ${data.totalAmount}원</p>`;
+        })
+        .catch((err) => {
+            // 실패 시 fail.html로 이동
+            window.location.href = `/fail.html?message=${err.message}&code=${err.code}`;
+        });
+</script>
+</body>
+</html>
