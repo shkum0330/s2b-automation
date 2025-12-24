@@ -1,16 +1,17 @@
 import pyperclip
 from PyQt5.QtWidgets import (QWidget, QLabel, QLineEdit, QTextEdit,
                              QPushButton, QVBoxLayout, QGroupBox, QGridLayout,
-                             QMessageBox, QHBoxLayout, QRadioButton, QFrame)  # QFrame 추가
+                             QMessageBox, QHBoxLayout, QRadioButton, QFrame)
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QFont
 from api_worker import ApiWorker
 from config import BASE_URL
 
 class MainWindow(QWidget):
-    def __init__(self, access_token=None):
+    def __init__(self, access_token=None, session=None):
         super().__init__()
         self.access_token = access_token
+        self.session = session
         self.worker = None
         self.current_task_id = None
         self.polling_timer = QTimer(self)
@@ -48,14 +49,13 @@ class MainWindow(QWidget):
         self.refresh_button.setFont(default_font)
         self.refresh_button.clicked.connect(self.update_credit_display)
 
-        # --- [NEW] 수직 구분선 생성 ---
         separator = QFrame()
-        separator.setFrameShape(QFrame.VLine)  # 수직선 모양
-        separator.setFrameShadow(QFrame.Sunken)  # 약간의 음영 효과
+        separator.setFrameShape(QFrame.VLine)
+        separator.setFrameShadow(QFrame.Sunken)
 
         top_layout = QHBoxLayout()
         top_layout.addLayout(product_type_layout)
-        top_layout.addWidget(separator)  # --- [NEW] 레이아웃에 구분선 추가 ---
+        top_layout.addWidget(separator)
         top_layout.addWidget(self.credit_label)
         top_layout.addWidget(self.refresh_button)
 
@@ -207,12 +207,13 @@ class MainWindow(QWidget):
         self.clear_outputs()
 
         headers = {"Content-Type": "application/json", "Authorization": self.access_token}
-        self.worker = ApiWorker('POST', url, payload=payload, headers=headers, timeout=65)
+
+        self.worker = ApiWorker('POST', url, payload=payload, headers=headers, timeout=65, session=self.session)
         self.worker.finished.connect(self.handle_task_start_response)
         self.worker.start()
 
     def handle_api_result(self, result):
-        self.status_label.setText("상태: ✅ AI 생성 완료!")
+        self.status_label.setText("상태: ✅ 견적 생성 완료!")
         for key, widgets in self.output_widgets.items():
             if widgets['field'].isVisible():
                 self.set_widget_text(widgets['field'], str(result.get(key, '')))
@@ -229,7 +230,8 @@ class MainWindow(QWidget):
         self.credit_label.setText("...새로고침 중...")
         url = f"{BASE_URL}/api/v1/members/me"
         headers = {"Authorization": self.access_token}
-        self.credit_worker = ApiWorker('GET', url, headers=headers)
+
+        self.credit_worker = ApiWorker('GET', url, headers=headers, session=self.session)
         self.credit_worker.finished.connect(self.handle_credit_response)
         self.credit_worker.start()
 
@@ -261,7 +263,8 @@ class MainWindow(QWidget):
             return
         url = f"{BASE_URL}/api/v1/generation/result/{self.current_task_id}"
         headers = {"Authorization": self.access_token}
-        self.worker = ApiWorker('GET', url, headers=headers, timeout=5)
+
+        self.worker = ApiWorker('GET', url, headers=headers, timeout=5, session=self.session)
         self.worker.finished.connect(self.handle_polling_response)
         self.worker.start()
 
@@ -288,7 +291,8 @@ class MainWindow(QWidget):
         self.status_label.setText("상태: ❌ 작업 취소 요청 중...")
         url = f"{BASE_URL}/api/v1/generation/cancel/{self.current_task_id}"
         headers = {"Authorization": self.access_token}
-        self.worker = ApiWorker('POST', url, headers=headers, timeout=10)
+
+        self.worker = ApiWorker('POST', url, headers=headers, timeout=10, session=self.session)
         self.worker.finished.connect(self.handle_cancel_response)
         self.worker.start()
 
