@@ -92,13 +92,13 @@ public class GenerationServiceImpl implements GenerationService {
     private void handleCreditDeduction(Member member, Throwable throwable, String type) {
         if (throwable == null) {
             try {
-                memberService.decrementCredit(member.getId());
-                log.info("{} 생성 성공. 사용자(ID: {}) 크레딧 차감.", type, member.getId());
+                memberService.decrementCredit(member.getMemberId());
+                log.info("{} 생성 성공. 사용자(ID: {}) 크레딧 차감.", type, member.getMemberId());
             } catch (Exception e) {
-                log.error("{} 생성 성공 후 크레딧 차감 중 에러 발생. 사용자 ID: {}", type, member.getId(), e);
+                log.error("{} 생성 성공 후 크레딧 차감 중 에러 발생. 사용자 ID: {}", type, member.getMemberId(), e);
             }
         } else {
-            log.warn("{} 생성 실패로 사용자(ID: {}) 크레딧을 차감하지 않았습니다.", type, member.getId(), throwable);
+            log.warn("{} 생성 실패로 사용자(ID: {}) 크레딧을 차감하지 않았습니다.", type, member.getMemberId(), throwable);
         }
     }
 }

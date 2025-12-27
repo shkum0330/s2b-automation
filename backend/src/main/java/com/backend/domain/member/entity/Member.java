@@ -14,7 +14,7 @@ public class Member extends BaseTimeEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @EqualsAndHashCode.Include
-    private Long id;
+    private Long memberId;
 
     @Column(nullable = false, unique = true)
     private String email;
