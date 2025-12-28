@@ -7,11 +7,12 @@ from PyQt5.QtGui import QFont
 from api_worker import ApiWorker
 from config import BASE_URL
 
+
 class MainWindow(QWidget):
     def __init__(self, access_token=None, session=None):
         super().__init__()
         self.access_token = access_token
-        self.session = session
+        self.session = session  # 세션 저장
         self.worker = None
         self.current_task_id = None
         self.polling_timer = QTimer(self)
@@ -181,6 +182,29 @@ class MainWindow(QWidget):
         self.output_widgets['manufacturer']['label'].setText("4. 제조사:" if is_electronic else "3. 제조사:")
         self.output_widgets['countryOfOrigin']['label'].setText("5. 원산지:" if is_electronic else "4. 원산지:")
 
+    # 토큰 갱신 시 호출
+    def update_access_token(self, new_token):
+        print(f"♻️ [MainWindow] Access Token이 갱신되었습니다.")
+        self.access_token = new_token
+
+    # ApiWorker 생성 및 실행을 위한 헬퍼 메서드
+    def _run_api_worker(self, worker_attr_name, method, url, callback, payload=None, timeout=65):
+        headers = {"Authorization": self.access_token}
+        if payload:
+            headers["Content-Type"] = "application/json"
+
+        # Worker 생성 (session 자동 전달)
+        worker = ApiWorker(method, url, payload=payload, headers=headers, timeout=timeout, session=self.session)
+
+        # 공통 시그널 연결 (토큰 갱신 및 완료 처리)
+        worker.token_refreshed.connect(self.update_access_token)
+        worker.finished.connect(callback)
+
+        # 멤버 변수에 할당 (GC 방지 및 참조 유지)
+        setattr(self, worker_attr_name, worker)
+
+        worker.start()
+
     def start_api_call(self):
         is_electronic = self.radio_electronic.isChecked()
         if is_electronic:
@@ -206,11 +230,8 @@ class MainWindow(QWidget):
         self.status_label.setText("상태: 🤖 작업 시작 요청 중...")
         self.clear_outputs()
 
-        headers = {"Content-Type": "application/json", "Authorization": self.access_token}
 
-        self.worker = ApiWorker('POST', url, payload=payload, headers=headers, timeout=65, session=self.session)
-        self.worker.finished.connect(self.handle_task_start_response)
-        self.worker.start()
+        self._run_api_worker('worker', 'POST', url, self.handle_task_start_response, payload=payload)
 
     def handle_api_result(self, result):
         self.status_label.setText("상태: ✅ 견적 생성 완료!")
@@ -229,11 +250,8 @@ class MainWindow(QWidget):
     def update_credit_display(self):
         self.credit_label.setText("...새로고침 중...")
         url = f"{BASE_URL}/api/v1/members/me"
-        headers = {"Authorization": self.access_token}
 
-        self.credit_worker = ApiWorker('GET', url, headers=headers, session=self.session)
-        self.credit_worker.finished.connect(self.handle_credit_response)
-        self.credit_worker.start()
+        self._run_api_worker('credit_worker', 'GET', url, self.handle_credit_response)
 
     def handle_credit_response(self, result):
         if result.get('ok'):
@@ -262,11 +280,8 @@ class MainWindow(QWidget):
         if not self.current_task_id:
             return
         url = f"{BASE_URL}/api/v1/generation/result/{self.current_task_id}"
-        headers = {"Authorization": self.access_token}
 
-        self.worker = ApiWorker('GET', url, headers=headers, timeout=5, session=self.session)
-        self.worker.finished.connect(self.handle_polling_response)
-        self.worker.start()
+        self._run_api_worker('worker', 'GET', url, self.handle_polling_response, timeout=5)
 
     def handle_polling_response(self, result):
         if not result.get('ok'):
@@ -290,11 +305,9 @@ class MainWindow(QWidget):
         self.polling_timer.stop()
         self.status_label.setText("상태: ❌ 작업 취소 요청 중...")
         url = f"{BASE_URL}/api/v1/generation/cancel/{self.current_task_id}"
-        headers = {"Authorization": self.access_token}
 
-        self.worker = ApiWorker('POST', url, headers=headers, timeout=10, session=self.session)
-        self.worker.finished.connect(self.handle_cancel_response)
-        self.worker.start()
+
+        self._run_api_worker('worker', 'POST', url, self.handle_cancel_response, timeout=10)
 
     def handle_cancel_response(self, result):
         if result.get('ok') and result.get('json', {}).get("success"):
