@@ -11,7 +11,6 @@ import java.util.concurrent.CompletableFuture;
 
 public interface GenerationService {
     /**
-     * [수정]
      * 전자제품 모델명과 예시를 기반으로 제품 사양 정보를 생성
      *
      * @param request DTO 객체 (modelName, specExample, productNameExample 포함)
@@ -22,7 +21,6 @@ public interface GenerationService {
     CompletableFuture<GenerateElectronicResponse> generateSpec(GenerateElectronicRequest request, Member member) throws GenerateApiException;
 
     /**
-     * [수정]
      * 비전자제품 제품명과 예시를 기반으로 제품 사양 정보를 생성
      *
      * @param request DTO 객체 (productName, specExample 포함)

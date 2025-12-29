@@ -30,7 +30,7 @@ public class GeminiService extends AbstractGenerationService {
     private int maxOutputTokens;
 
     public GeminiService(PromptBuilder promptBuilder, ObjectMapper objectMapper, WebClient webClient) {
-        super(promptBuilder, objectMapper, webClient); // 부모 생성자 변경
+        super(promptBuilder, objectMapper, webClient);
     }
 
     @Override
