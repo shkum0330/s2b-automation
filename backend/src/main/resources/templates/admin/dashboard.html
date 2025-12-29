@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{admin/layouts/layout}">
+
+<div layout:fragment="content">
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+        <h1 class="h2">📊 로그 대시보드</h1>
+    </div>
+
+    <div class="card mb-4 border-0 shadow-sm">
+        <div class="card-body bg-light rounded">
+            <div class="row g-2">
+                <div class="col-md-3">
+                    <input type="text" class="form-control" id="searchEmail" placeholder="사용자 이메일">
+                </div>
+                <div class="col-md-3">
+                    <input type="text" class="form-control" id="searchModel" placeholder="모델명">
+                </div>
+                <div class="col-md-2">
+                    <select class="form-select" id="searchSuccess">
+                        <option value="ALL">전체 상태</option>
+                        <option value="true">✅ 성공</option>
+                        <option value="false">❌ 실패</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button class="btn btn-primary w-100" onclick="loadLogs(0)">
+                        <i class="bi bi-search"></i> 검색
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover table-striped mb-0 align-middle">
+                    <thead class="table-light">
+                    <tr>
+                        <th width="10%">ID</th>
+                        <th width="25%">사용자</th>
+                        <th width="35%">모델명</th> <th width="10%">상태</th>
+                        <th width="20%">일시</th>
+                    </tr>
+                    </thead>
+                    <tbody id="logTableBody">
+                    <tr>
+                        <td colspan="5" class="text-center py-5">
+                            <div class="spinner-border text-secondary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="card-footer bg-white py-3">
+            <nav>
+                <ul class="pagination justify-content-center mb-0" id="pagination"></ul>
+            </nav>
+        </div>
+    </div>
+
+    <div class="modal fade" id="detailModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">📝 로그 상세 정보 (<span id="detailId"></span>)</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <strong>결과:</strong> <span id="detailResult"></span>
+                    </div>
+                    <div id="detailErrorBox" class="alert alert-danger d-none">
+                        <strong>에러 내용:</strong> <span id="detailError"></span>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Request JSON</label>
+                        <pre class="bg-light p-3 border rounded small" id="detailRequest" style="max-height: 200px; overflow-y: auto;"></pre>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Response JSON</label>
+                        <pre class="bg-light p-3 border rounded small" id="detailResponse" style="max-height: 200px; overflow-y: auto;"></pre>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">닫기</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<th:block layout:fragment="script">
+    <script src="/js/admin-dashboard.js"></script>
+</th:block>
+</html>

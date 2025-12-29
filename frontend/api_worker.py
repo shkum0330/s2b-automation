@@ -1,5 +1,3 @@
-# api_worker.py
-
 import requests
 from PyQt5.QtCore import QThread, pyqtSignal
 

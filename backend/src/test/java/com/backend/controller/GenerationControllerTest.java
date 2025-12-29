@@ -107,7 +107,7 @@ class GenerationControllerTest {
         response.setCertificationNumber(certResponse);
 
         // 서비스가 CompletableFuture를 반환하도록 Mocking
-        when(generationService.generateSpec(any(), any(), any(),any())).thenReturn(CompletableFuture.completedFuture(response));
+        when(generationService.generateSpec(any(), any())).thenReturn(CompletableFuture.completedFuture(response));
 
         // when & then & andDo(document)
         mockMvc.perform(RestDocumentationRequestBuilders.post("/api/generate-spec")

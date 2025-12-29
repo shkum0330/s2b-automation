@@ -25,8 +25,15 @@ public class AuthController {
      * 카카오 로그인 처리 컨트롤러
      */
     @GetMapping("/callback/kakao")
-    public ResponseEntity<?> kakaoLogin(@RequestParam(name = "code") String code, HttpServletResponse response) throws IOException {
-        LoginResponseDto dto = kakaoService.kakaoLogin(code, response);
+    public ResponseEntity<?> kakaoLogin(
+            @RequestParam(name = "code") String code,
+            @RequestParam(name = "redirectUri", required = false) String redirectUri,
+            HttpServletResponse response) throws IOException {
+
+        // todo: 기본 리다이렉트 uri 설정
+        String uri = (redirectUri != null && !redirectUri.isBlank()) ? redirectUri : "http://localhost:8989";
+
+        LoginResponseDto dto = kakaoService.kakaoLogin(code, uri, response);
         return ResponseEntity.ok(dto);
     }
 

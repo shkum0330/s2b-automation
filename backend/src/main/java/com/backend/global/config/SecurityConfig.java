@@ -23,6 +23,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 
 @Configuration
 @EnableWebSecurity
@@ -66,34 +67,41 @@ public class SecurityConfig {
         // 2. 요청별 권한 설정
         http
                 .authorizeHttpRequests(auth -> auth
-                        // 정적 리소스는 모두 허용
+                        // 1. 정적 리소스 (CSS, JS, 이미지) 허용
                         .requestMatchers(PathRequest.toStaticResources().atCommonLocations()).permitAll()
+                        .requestMatchers("/css/**", "/js/**", "/images/**").permitAll() // [추가] 커스텀 정적 경로
 
-                        // OPTIONS 메서드는 preflight 요청이므로 모두 허용
+                        // 2. OPTIONS 메서드 허용
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
-                        // 인증 없이 접근을 허용할 특정 경로들
                         .requestMatchers(
                                 "/",
                                 "/index.html",
                                 "/favicon.ico",
                                 "/api/v1/auth/callback/kakao",
                                 "/api/v1/auth/token",
-                                "/actuator/health",
+                                "/actuator/**",
                                 "/ping",
-                                "/error"
+                                "/error",
+                                "/admin/login",
+                                "/widget/**",
+                                "/payment/**",
+                                "/brandpay/**"
+                                ,"/style.css"
                         ).permitAll()
+                        .requestMatchers("/api/v1/payments/**").permitAll()
+                        // 3. GET 요청 허용 (기존 정책 유지)
+                        .requestMatchers(HttpMethod.GET, "/api/v1/**").permitAll()
 
-                        // GET 메서드로 허용할 경로들
-                        .requestMatchers(HttpMethod.GET,
-                                "/api/v1/**"
-                        ).permitAll()
+                        // 4. 어드민 대시보드 페이지는 인증 필요
+                        //  todo: 엄격하게 하려면 authenticated() 후 필터 예외 처리 필요
+                        //  일단은 간편하게 모든 /admin/** 요청을 열어두고, 데이터 API에서 막음
+                        .requestMatchers("/admin/**").permitAll()
 
-                        // 위에서 정의한 경로 외의 모든 요청은 인증 필요
+                        // 그 외 모든 요청은 인증 필요
                         .anyRequest().authenticated()
                 );
 
-        // 3. 커스텀 필터 추가
         http
                 .addFilterBefore(new JwtAuthenticationFilter(jwtProvider, memberDetailsService), UsernamePasswordAuthenticationFilter.class);
         return http.build();
