@@ -42,7 +42,7 @@ class MainController:
 
         if self.access_token:
             print(f"Access Token 저장 성공: {self.access_token}")
-            # --- 수정된 부분 ---
+
             # 토큰을 성공적으로 받은 후에 MainWindow를 생성하고 표시
             self.show_main_window(self.access_token)
         else:

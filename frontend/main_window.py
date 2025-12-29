@@ -70,8 +70,8 @@ class MainWindow(QWidget):
         self.input_widgets['spec_example_label'] = QLabel("2. 규격 예시:")
         self.input_widgets['spec_example_input'] = QTextEdit()
         self.input_widgets['spec_example_input'].setFixedHeight(80)
-        self.input_widgets['model_label'] = QLabel("3. 모델명:")
-        self.input_widgets['model_input'] = QLineEdit()
+        self.input_widgets['model_name_label'] = QLabel("3. 모델명:")  # (선택사항) 라벨 키도 맞춤
+        self.input_widgets['model_name_input'] = QLineEdit()
 
         for widget in self.input_widgets.values():
             widget.setFont(default_font)
@@ -82,8 +82,8 @@ class MainWindow(QWidget):
         req_layout.addWidget(self.input_widgets['product_name_input'], 0, 1)
         req_layout.addWidget(self.input_widgets['spec_example_label'], 1, 0, Qt.AlignTop)
         req_layout.addWidget(self.input_widgets['spec_example_input'], 1, 1)
-        req_layout.addWidget(self.input_widgets['model_label'], 2, 0)
-        req_layout.addWidget(self.input_widgets['model_input'], 2, 1)
+        req_layout.addWidget(self.input_widgets['model_name_label'], 2, 0)
+        req_layout.addWidget(self.input_widgets['model_name_input'], 2, 1)
 
         request_group.setLayout(req_layout)
 
@@ -160,8 +160,8 @@ class MainWindow(QWidget):
 
         self.input_widgets['product_name_example_label'].setVisible(is_electronic)
         self.input_widgets['product_name_example_input'].setVisible(is_electronic)
-        self.input_widgets['model_label'].setVisible(is_electronic)
-        self.input_widgets['model_input'].setVisible(is_electronic)
+        self.input_widgets['model_name_label'].setVisible(is_electronic)
+        self.input_widgets['model_name_input'].setVisible(is_electronic)
         self.input_widgets['product_name_label'].setVisible(not is_electronic)
         self.input_widgets['product_name_input'].setVisible(not is_electronic)
 
@@ -184,14 +184,14 @@ class MainWindow(QWidget):
     def start_api_call(self):
         is_electronic = self.radio_electronic.isChecked()
         if is_electronic:
-            model = self.input_widgets['model_input'].text()
+            model_name = self.input_widgets['model_name_input'].text()
             spec_example = self.input_widgets['spec_example_input'].toPlainText()
             product_name_example = self.input_widgets['product_name_example_input'].text()
-            if not model or not spec_example:
+            if not model_name or not spec_example:
                 QMessageBox.warning(self, "입력 오류", "모델명과 규격 예시는 반드시 입력해야 합니다.")
                 return
             url = f'{BASE_URL}/api/v1/generation/generate-spec'
-            payload = {"model": model, "specExample": spec_example, "productNameExample": product_name_example}
+            payload = {"modelName": model_name, "specExample": spec_example, "productNameExample": product_name_example}
         else:
             product_name = self.input_widgets['product_name_input'].text()
             spec_example = self.input_widgets['spec_example_input'].toPlainText()
