@@ -62,7 +62,6 @@ public class GenerationServiceImpl implements GenerationService {
         combinedFuture.whenCompleteAsync((result, throwable) -> {
             handleCreditDeduction(member, throwable, "전자제품");
 
-            // 전달받은 원본 request DTO를 이벤트에 담아 발행
             eventPublisher.publishEvent(new GenerationLogEvent(member, request, result, throwable));
 
         }, taskExecutor);
@@ -82,7 +81,6 @@ public class GenerationServiceImpl implements GenerationService {
         future.whenCompleteAsync((result, throwable) -> {
             handleCreditDeduction(member, throwable, "비전자제품");
 
-            // [수정] 전달받은 원본 request DTO를 이벤트에 담아 발행
             eventPublisher.publishEvent(new GenerationLogEvent(member, request, result, throwable));
 
         }, taskExecutor);

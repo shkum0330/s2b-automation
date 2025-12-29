@@ -48,14 +48,14 @@ class MainWindow(QWidget):
         self.refresh_button.setFont(default_font)
         self.refresh_button.clicked.connect(self.update_credit_display)
 
-        # --- [NEW] 수직 구분선 생성 ---
+        # --- 수직 구분선 ---
         separator = QFrame()
         separator.setFrameShape(QFrame.VLine)  # 수직선 모양
         separator.setFrameShadow(QFrame.Sunken)  # 약간의 음영 효과
 
         top_layout = QHBoxLayout()
         top_layout.addLayout(product_type_layout)
-        top_layout.addWidget(separator)  # --- [NEW] 레이아웃에 구분선 추가 ---
+        top_layout.addWidget(separator)
         top_layout.addWidget(self.credit_label)
         top_layout.addWidget(self.refresh_button)
 
@@ -70,7 +70,8 @@ class MainWindow(QWidget):
         self.input_widgets['spec_example_label'] = QLabel("2. 규격 예시:")
         self.input_widgets['spec_example_input'] = QTextEdit()
         self.input_widgets['spec_example_input'].setFixedHeight(80)
-        self.input_widgets['model_name_label'] = QLabel("3. 모델명:")  # (선택사항) 라벨 키도 맞춤
+        self.input_widgets['spec_example_input'].setAcceptRichText(False)
+        self.input_widgets['model_name_label'] = QLabel("3. 모델명:")
         self.input_widgets['model_name_input'] = QLineEdit()
 
         for widget in self.input_widgets.values():
