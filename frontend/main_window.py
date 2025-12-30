@@ -2,17 +2,20 @@ import pyperclip
 from PyQt5.QtWidgets import (QWidget, QLabel, QLineEdit, QTextEdit,
                              QPushButton, QVBoxLayout, QGroupBox, QGridLayout,
                              QMessageBox, QHBoxLayout, QRadioButton, QFrame)
-from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtCore import Qt, QTimer, pyqtSignal
 from PyQt5.QtGui import QFont
 from api_worker import ApiWorker
 from config import BASE_URL
 
 
 class MainWindow(QWidget):
+    # 로그아웃 요청 시그널
+    logout_requested = pyqtSignal()
+
     def __init__(self, access_token=None, session=None):
         super().__init__()
         self.access_token = access_token
-        self.session = session  # 세션 저장
+        self.session = session
         self.worker = None
         self.current_task_id = None
         self.polling_timer = QTimer(self)
@@ -45,10 +48,16 @@ class MainWindow(QWidget):
 
         self.credit_label = QLabel("남은 크레딧: -")
         self.credit_label.setFont(default_font)
+
         self.refresh_button = QPushButton("새로고침")
-        self.refresh_button.setFixedWidth(150)
+        self.refresh_button.setFixedWidth(100)
         self.refresh_button.setFont(default_font)
         self.refresh_button.clicked.connect(self.update_credit_display)
+
+        self.logout_button = QPushButton("로그아웃")
+        self.logout_button.setFixedWidth(100)
+        self.logout_button.setFont(default_font)
+        self.logout_button.clicked.connect(self.handle_manual_logout)
 
         separator = QFrame()
         separator.setFrameShape(QFrame.VLine)
@@ -59,6 +68,7 @@ class MainWindow(QWidget):
         top_layout.addWidget(separator)
         top_layout.addWidget(self.credit_label)
         top_layout.addWidget(self.refresh_button)
+        top_layout.addWidget(self.logout_button)
 
         request_group = QGroupBox("서버에 보낼 정보")
         request_group.setFont(default_font)
@@ -69,10 +79,14 @@ class MainWindow(QWidget):
         self.input_widgets['product_name_label'] = QLabel("1. 물품(용역)명:")
         self.input_widgets['product_name_input'] = QLineEdit()
         self.input_widgets['spec_example_label'] = QLabel("2. 규격 예시:")
+
+
         self.input_widgets['spec_example_input'] = QTextEdit()
         self.input_widgets['spec_example_input'].setFixedHeight(80)
-        self.input_widgets['model_label'] = QLabel("3. 모델명:")
-        self.input_widgets['model_input'] = QLineEdit()
+        self.input_widgets['spec_example_input'].setAcceptRichText(False)
+
+        self.input_widgets['model_name_label'] = QLabel("3. 모델명:")
+        self.input_widgets['model_name_input'] = QLineEdit()
 
         for widget in self.input_widgets.values():
             widget.setFont(default_font)
@@ -83,8 +97,8 @@ class MainWindow(QWidget):
         req_layout.addWidget(self.input_widgets['product_name_input'], 0, 1)
         req_layout.addWidget(self.input_widgets['spec_example_label'], 1, 0, Qt.AlignTop)
         req_layout.addWidget(self.input_widgets['spec_example_input'], 1, 1)
-        req_layout.addWidget(self.input_widgets['model_label'], 2, 0)
-        req_layout.addWidget(self.input_widgets['model_input'], 2, 1)
+        req_layout.addWidget(self.input_widgets['model_name_label'], 2, 0)
+        req_layout.addWidget(self.input_widgets['model_name_input'], 2, 1)
 
         request_group.setLayout(req_layout)
 
@@ -161,8 +175,8 @@ class MainWindow(QWidget):
 
         self.input_widgets['product_name_example_label'].setVisible(is_electronic)
         self.input_widgets['product_name_example_input'].setVisible(is_electronic)
-        self.input_widgets['model_label'].setVisible(is_electronic)
-        self.input_widgets['model_input'].setVisible(is_electronic)
+        self.input_widgets['model_name_label'].setVisible(is_electronic)
+        self.input_widgets['model_name_input'].setVisible(is_electronic)
         self.input_widgets['product_name_label'].setVisible(not is_electronic)
         self.input_widgets['product_name_input'].setVisible(not is_electronic)
 
@@ -182,40 +196,58 @@ class MainWindow(QWidget):
         self.output_widgets['manufacturer']['label'].setText("4. 제조사:" if is_electronic else "3. 제조사:")
         self.output_widgets['countryOfOrigin']['label'].setText("5. 원산지:" if is_electronic else "4. 원산지:")
 
-    # 토큰 갱신 시 호출
     def update_access_token(self, new_token):
         print(f"♻️ [MainWindow] Access Token이 갱신되었습니다.")
         self.access_token = new_token
 
-    # ApiWorker 생성 및 실행을 위한 헬퍼 메서드
+    # 세션 만료 시 호출
+    def handle_session_expired(self):
+        QMessageBox.warning(self, "세션 만료", "로그인 세션이 만료되었습니다.\n다시 로그인해주세요.")
+        self.logout_requested.emit()
+
+    # [추가] 로그아웃 처리
+    def handle_manual_logout(self):
+        url = f"{BASE_URL}/api/v1/auth/logout"
+        headers = {"Authorization": self.access_token}
+
+        # 로그아웃 요청 (Fire and forget)
+        self.worker = ApiWorker('POST', url, headers=headers, session=self.session)
+        self.worker.start()
+
+        QMessageBox.information(self, "로그아웃", "성공적으로 로그아웃되었습니다.")
+        self.logout_requested.emit()
+
+    # ApiWorker 실행 공통 메서드 (Session, Signal 연결 포함)
     def _run_api_worker(self, worker_attr_name, method, url, callback, payload=None, timeout=65):
         headers = {"Authorization": self.access_token}
         if payload:
             headers["Content-Type"] = "application/json"
 
-        # Worker 생성 (session 자동 전달)
+        # session 객체를 전달하여 쿠키 유지
         worker = ApiWorker(method, url, payload=payload, headers=headers, timeout=timeout, session=self.session)
 
-        # 공통 시그널 연결 (토큰 갱신 및 완료 처리)
+        # 시그널 연결
         worker.token_refreshed.connect(self.update_access_token)
+        worker.session_expired.connect(self.handle_session_expired)
         worker.finished.connect(callback)
 
-        # 멤버 변수에 할당 (GC 방지 및 참조 유지)
         setattr(self, worker_attr_name, worker)
-
         worker.start()
 
     def start_api_call(self):
         is_electronic = self.radio_electronic.isChecked()
         if is_electronic:
-            model = self.input_widgets['model_input'].text()
+            model_name = self.input_widgets['model_name_input'].text()
             spec_example = self.input_widgets['spec_example_input'].toPlainText()
             product_name_example = self.input_widgets['product_name_example_input'].text()
-            if not model or not spec_example:
+
+            if not model_name or not spec_example:
                 QMessageBox.warning(self, "입력 오류", "모델명과 규격 예시는 반드시 입력해야 합니다.")
                 return
+
             url = f'{BASE_URL}/api/v1/generation/generate-spec'
-            payload = {"model": model, "specExample": spec_example, "productNameExample": product_name_example}
+
+            payload = {"modelName": model_name, "specExample": spec_example, "productNameExample": product_name_example}
         else:
             product_name = self.input_widgets['product_name_input'].text()
             spec_example = self.input_widgets['spec_example_input'].toPlainText()
@@ -230,7 +262,7 @@ class MainWindow(QWidget):
         self.status_label.setText("상태: 🤖 작업 시작 요청 중...")
         self.clear_outputs()
 
-
+        # session 및 retry 로직 적용
         self._run_api_worker('worker', 'POST', url, self.handle_task_start_response, payload=payload)
 
     def handle_api_result(self, result):
@@ -250,7 +282,6 @@ class MainWindow(QWidget):
     def update_credit_display(self):
         self.credit_label.setText("...새로고침 중...")
         url = f"{BASE_URL}/api/v1/members/me"
-
         self._run_api_worker('credit_worker', 'GET', url, self.handle_credit_response)
 
     def handle_credit_response(self, result):
@@ -280,7 +311,6 @@ class MainWindow(QWidget):
         if not self.current_task_id:
             return
         url = f"{BASE_URL}/api/v1/generation/result/{self.current_task_id}"
-
         self._run_api_worker('worker', 'GET', url, self.handle_polling_response, timeout=5)
 
     def handle_polling_response(self, result):
@@ -305,8 +335,6 @@ class MainWindow(QWidget):
         self.polling_timer.stop()
         self.status_label.setText("상태: ❌ 작업 취소 요청 중...")
         url = f"{BASE_URL}/api/v1/generation/cancel/{self.current_task_id}"
-
-
         self._run_api_worker('worker', 'POST', url, self.handle_cancel_response, timeout=10)
 
     def handle_cancel_response(self, result):

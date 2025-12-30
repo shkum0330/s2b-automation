@@ -1,36 +1,36 @@
 import sys
+import requests
 from PyQt5.QtWidgets import QApplication, QMessageBox
 
 from login_window import LoginWindow
 from main_window import MainWindow
 from api_worker import ApiWorker
-import requests
 from config import BASE_URL
 
-# 전체 애플리케이션의 흐름을 제어하는 메인 컨트롤러
+
 class MainController:
-    # 컨트롤러 초기화
     def __init__(self):
         self.login_win = LoginWindow()
-        self.main_win = None  # main_win을 None으로 초기화
+        self.main_win = None
         self.api_worker = None
         self.access_token = None
 
+        # 쿠키 유지를 위한 세션 객체
         self.session = requests.Session()
+
         self.login_win.login_success.connect(self.process_login)
 
-    # 로그인 윈도우를 화면에 표시
     def show_login_window(self):
         self.login_win.show()
 
     def process_login(self, auth_code):
-        url = f"http://localhost:8080/api/v1/auth/callback/kakao?code={auth_code}"
-        # 로그인 요청 시 세션 객체(self.session) 전달 -> 리프레시 토큰 쿠키 저장됨
+        url = f"{BASE_URL}/api/v1/auth/callback/kakao?code={auth_code}"
+
+        # session 객체 전달
         self.api_worker = ApiWorker('GET', url, session=self.session)
         self.api_worker.finished.connect(self.handle_login_response)
         self.api_worker.start()
 
-    # 백엔드 로그인 요청의 응답 처리
     def handle_login_response(self, response):
         if not response.get('ok'):
             error_msg = response.get('json', {}).get('message', '알 수 없는 로그인 오류')
@@ -40,25 +40,35 @@ class MainController:
         headers = response.get('headers', {})
         self.access_token = headers.get('Authorization')
 
-        print("Saved Cookies:", self.session.cookies.get_dict())
+        print("로그인 후 저장된 쿠키:", self.session.cookies.get_dict())
 
         if self.access_token:
-            print(f"Access Token 저장 성공: {self.access_token}")
-            # 토큰을 성공적으로 받은 후에 MainWindow를 생성하고 표시
             self.show_main_window(self.access_token)
-
         else:
             QMessageBox.critical(self.login_win, "로그인 실패", "Access Token을 받지 못했습니다.")
 
-    # 로그인 창을 닫고 메인 윈도우를 표시
     def show_main_window(self, access_token):
-        # --- 수정된 부분 ---
-        # MainWindow를 새로 생성하며 access_token 전달
         if self.main_win is None:
+            # session 전달 및 로그아웃 시그널 연결
             self.main_win = MainWindow(access_token=access_token, session=self.session)
+            self.main_win.logout_requested.connect(self.process_logout)
 
         self.login_win.close()
         self.main_win.show()
+
+    # 로그아웃 처리 메서드
+    def process_logout(self):
+        print("🚪 로그아웃 처리 중...")
+        if self.main_win:
+            self.main_win.close()
+            self.main_win = None  # 메인 윈도우 초기화
+
+        # 세션 초기화 (쿠키 삭제 효과)
+        self.session = requests.Session()
+        self.access_token = None
+
+        # 로그인 윈도우 다시 열기
+        self.show_login_window()
 
 
 if __name__ == '__main__':
