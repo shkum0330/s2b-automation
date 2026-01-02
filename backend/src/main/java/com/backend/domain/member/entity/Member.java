@@ -72,4 +72,13 @@ public class Member extends BaseTimeEntity {
         this.lastRequestDate = date;
     }
 
+    // 메모리 상의 객체 상태를 DB와 맞추기 위한 메서드
+    public void decrementRequestCount() {
+        if (this.credit <= 0) {
+            // 이미 DB에서 검증했지만, 객체 상태 무결성을 위해 한 번 더 체크
+            throw new IllegalStateException("크레딧이 부족합니다.");
+        }
+        this.credit--;
+    }
+
 }

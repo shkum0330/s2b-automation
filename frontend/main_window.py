@@ -245,7 +245,16 @@ class MainWindow(QWidget):
     def handle_task_start_response(self, result):
         if not result.get('ok'):
             self.update_credit_display()
+            json_response = result.get('json', {})
+            error_message = json_response.get('message', result.get('error', '알 수 없는 오류'))
+
+            if 'errors' in json_response and json_response['errors']:
+                detailed_errors = []
+                for field, msg in json_response['errors'].items():
+                    detailed_errors.append(f"- {field}: {msg}")
+                error_message += "\n\n[상세 내용]\n" + "\n".join(detailed_errors)
             self.handle_error(result.get('json', {}).get('message', result.get('error', '알 수 없는 오류')))
+
             return
 
         json_body = result.get('json', {})
