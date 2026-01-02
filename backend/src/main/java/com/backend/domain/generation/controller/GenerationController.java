@@ -15,6 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -55,12 +56,17 @@ public class GenerationController {
                 memberDetails.member()
         );
 
-        // 폴링이 불필요하므로, 서버에서 결과를 기다렸다가 즉시 반환
         try {
-            GenerateNonElectronicResponse result = future.join(); // 비동기 작업이 완료될 때까지 대기
-            return ResponseEntity.ok(Map.of("result", result, "taskId", (Object) null));
+            GenerateNonElectronicResponse result = future.join();
+
+            // Map.of 대신 HashMap 사용 (null 허용을 위해)
+            Map<String, Object> response = new HashMap<>();
+            response.put("result", result);
+            response.put("taskId", null);
+            log.info("생성 결과: {}",result.toString());
+            return ResponseEntity.ok(response);
+
         } catch (Exception e) {
-            // 비동기 작업 중 발생한 예외를 처리
             throw new CompletionException(e.getCause());
         }
     }
