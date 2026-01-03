@@ -4,7 +4,7 @@ import time
 import sys
 
 
-TARGET_SERVER_URL = "http://localhost:8080/api/generate-spec"
+TARGET_SERVER_URL = "http://localhost:8080/api/v1/generation/generate-spec"
 OLLAMA_API_URL = "http://localhost:11434/api/generate"
 MODEL_NAME = "llama3"
 
@@ -15,7 +15,7 @@ def get_virtual_user_data():
     prompt = """
     You are a QA Tester. Create a JSON object for testing an electronics product API.
     Fields required:
-    1. "model": A realistic model number (e.g., "XY-1004", "TV-QLED-55").
+    1. "modelName": A realistic model number (e.g., "XY-1004", "TV-QLED-55").
     2. "specExample": Specifications in Korean (e.g., "220V / 60Hz / 소비전력 50W").
     3. "productNameExample": A product name in Korean (e.g., "삼성전자 스마트 TV", "LG 공기청정기").
 
