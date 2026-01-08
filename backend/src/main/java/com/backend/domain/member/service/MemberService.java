@@ -86,40 +86,22 @@ public class MemberService {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void decrementCredit(Long memberId) {
-        LocalDate today = LocalDate.now();
-
-        // 1. 회원 정보를 읽어옴
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new IllegalArgumentException("ID에 해당하는 멤버를 찾을 수 없습니다: " + memberId));
 
-        // 2. 구독 만료일 체크 및 갱신
-        if (member.getPlanExpiresAt() != null && member.getPlanExpiresAt().isBefore(today)) {
-            member.setRole(Role.FREE_USER);
-            member.setPlanExpiresAt(null);
-            log.info("사용자(ID: {})의 구독이 만료되어 FREE_USER로 변경되었습니다.", memberId);
+        log.info("요청 전 크레딧: {}", member.getCredit());
+
+        // DB에 직접 UPDATE 쿼리 실행 (동시성 보장, 원자적 연산)
+        int updatedRows = memberRepository.decrementCreditIfPossible(memberId);
+
+        if (updatedRows == 0) {
+            throw new IllegalStateException("크레딧이 부족합니다.");
         }
 
-        // 3. 일일 사용량 초기화 체크
-        if (member.getLastRequestDate() == null || !member.getLastRequestDate().equals(today)) {
-            member.resetDailyCount(today);
-            // resetDailyCount는 dailyRequestCount를 0으로 설정하므로, DB에 즉시 반영
-            memberRepository.saveAndFlush(member);
-            log.info("사용자(ID: {})의 일일 사용량이 초기화되었습니다.", memberId);
-        }
+        // DB 업데이트가 성공했으므로, 메모리 상의 객체 값도 맞춰줌
+        member.decrementRequestCount();
 
-        // 4. 현재 등급의 일일 한도 확인
-        int dailyLimit = member.getRole().getDailyCreditLimit();
-
-        // 5. 한도 내에서 일일 사용량 원자적으로 증가
-        log.info("사용자(ID: {}) 크레딧 사용 시도. (현재 사용량: {}, 한도: {})", memberId, member.getDailyRequestCount(), dailyLimit);
-
-        int updated = memberRepository.incrementDailyCountIfPossible(memberId, dailyLimit);
-
-        if (updated == 0) {
-            throw new IllegalStateException("일일 크레딧 한도를 초과했습니다.");
-        }
-
-        log.info("사용자(ID: {}) 크레딧 사용 성공. (갱신 후 사용량: {}/{})", memberId, member.getDailyRequestCount() + 1, dailyLimit);
+        log.info("요청 후 크레딧(DB 반영 및 메모리 동기화 완료): {}", member.getCredit());
     }
 
     @Transactional(readOnly = true)

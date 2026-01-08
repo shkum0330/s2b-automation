@@ -15,6 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -33,12 +34,13 @@ public class GenerationController {
             @Valid @RequestBody GenerateElectronicRequest request,
             @AuthenticationPrincipal MemberDetails memberDetails) {
 
+        log.info("서비스 호출 전: {}", request);
         // 여러 API를 호출하고 조합하는 비동기 작업
         CompletableFuture<GenerateElectronicResponse> future = generationService.generateSpec(
                 request,
                 memberDetails.member()
         );
-
+        log.info("서비스 호출 후: {}", request);
         // TaskService에 작업을 등록하고 클라이언트가 폴링할 수 있도록 taskId를 반환
         String taskId = taskService.submitTask(future);
         return ResponseEntity.accepted().body(Map.of("taskId", taskId));
@@ -55,12 +57,17 @@ public class GenerationController {
                 memberDetails.member()
         );
 
-        // 폴링이 불필요하므로, 서버에서 결과를 기다렸다가 즉시 반환
         try {
-            GenerateNonElectronicResponse result = future.join(); // 비동기 작업이 완료될 때까지 대기
-            return ResponseEntity.ok(Map.of("result", result, "taskId", (Object) null));
+            GenerateNonElectronicResponse result = future.join();
+
+            // Map.of 대신 HashMap 사용 (null 허용을 위해)
+            Map<String, Object> response = new HashMap<>();
+            response.put("result", result);
+            response.put("taskId", null);
+            log.info("생성 결과: {}",result.toString());
+            return ResponseEntity.ok(response);
+
         } catch (Exception e) {
-            // 비동기 작업 중 발생한 예외를 처리
             throw new CompletionException(e.getCause());
         }
     }
