@@ -16,4 +16,8 @@ public interface MemberRepository extends JpaRepository<Member, Long> {
     @Modifying
     @Query("update Member m set m.credit = m.credit - 1 where m.memberId = :id and m.credit > 0")
     int decrementCreditIfPossible(@Param("id") Long id);
+
+    @Modifying
+    @Query("update Member m set m.credit = m.credit + 1 where m.memberId = :id")
+    void incrementCredit(@Param("id") Long id);
 }

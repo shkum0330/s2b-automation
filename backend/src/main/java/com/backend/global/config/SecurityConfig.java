@@ -13,6 +13,7 @@ import org.springframework.security.config.annotation.authentication.configurati
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configuration.WebSecurityCustomizer;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
@@ -37,6 +38,13 @@ public class SecurityConfig {
     @Bean
     public AuthenticationManager authenticationManager() throws Exception {
         return authenticationConfiguration.getAuthenticationManager();
+    }
+
+    @Bean
+    public WebSecurityCustomizer webSecurityCustomizer() {
+        return (web) -> web.ignoring()
+                .requestMatchers(PathRequest.toStaticResources().atCommonLocations())
+                .requestMatchers("/css/**", "/js/**", "/images/**", "/style.css", "/favicon.ico", "/error");
     }
 
     @Bean
@@ -77,17 +85,14 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/",
                                 "/index.html",
-                                "/favicon.ico",
                                 "/api/v1/auth/callback/kakao",
                                 "/api/v1/auth/token",
                                 "/actuator/**",
                                 "/ping",
-                                "/error",
                                 "/admin/login",
                                 "/widget/**",
                                 "/payment/**",
                                 "/brandpay/**"
-                                ,"/style.css"
                         ).permitAll()
                         .requestMatchers("/api/v1/payments/**").permitAll()
                         // 3. GET 요청 허용 (기존 정책 유지)
