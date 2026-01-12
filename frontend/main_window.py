@@ -13,6 +13,7 @@ class PlainTextPasteEdit(QTextEdit):
     def insertFromMimeData(self, source):
         if source.hasText():
             text = source.text()
+            # 줄바꿈 문자를 공백으로 변경하여 단어가 붙지 않도록 함
             text = text.replace('\r\n', ' ').replace('\n', ' ').replace('\r', ' ')
             self.insertPlainText(text)
         else:
@@ -81,7 +82,7 @@ class MainWindow(QWidget):
         self.input_widgets['product_name_input'] = QLineEdit()
         self.input_widgets['spec_example_label'] = QLabel("2. 규격 예시:")
 
-        # 커스텀 위젯 적용
+        # 커스텀 위젯 적용 (붙여넣기 시 줄바꿈 제거)
         self.input_widgets['spec_example_input'] = PlainTextPasteEdit()
         self.input_widgets['spec_example_input'].setFixedHeight(80)
 
@@ -118,7 +119,9 @@ class MainWindow(QWidget):
             output_field = QLineEdit() if key != "specification" else QTextEdit()
             if isinstance(output_field, QTextEdit):
                 output_field.setFixedHeight(80)
-            output_field.setReadOnly(True)
+
+            # output_field.setReadOnly(True)
+
             copy_button = QPushButton("복사")
             copy_button.setFixedWidth(100)
             copy_button.clicked.connect(lambda _, w=output_field: self.copy_to_clipboard(w))
