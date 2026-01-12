@@ -53,7 +53,7 @@ public class MemberService {
         Member member = memberRepository.findByEmail(email)
                 .orElseThrow(() -> NotFoundException.entityNotFound("멤버"));
 
-        return jwtProvider.createAccessToken(email, member.getRole());
+        return jwtProvider.createAccessToken(email, member.getRole(),member.getMemberId());
     }
 
     /**
@@ -113,6 +113,8 @@ public class MemberService {
 
     @Transactional(readOnly = true)
     public MemberResponseDto getMemberInfo(Member member) {
-        return new MemberResponseDto(member);
+        Member realMember = memberRepository.findById(member.getMemberId())
+                .orElseThrow(() -> NotFoundException.entityNotFound("Member"));
+        return new MemberResponseDto(realMember);
     }
 }
