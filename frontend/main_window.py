@@ -1,11 +1,23 @@
 import pyperclip
 from PyQt5.QtWidgets import (QWidget, QLabel, QLineEdit, QTextEdit,
                              QPushButton, QVBoxLayout, QGroupBox, QGridLayout,
-                             QMessageBox, QHBoxLayout, QRadioButton, QFrame)  # QFrame 추가
+                             QMessageBox, QHBoxLayout, QRadioButton, QFrame)
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QFont
 from api_worker import ApiWorker
 from config import BASE_URL
+
+
+# 붙여넣기 시 줄바꿈을 공백으로 치환하고 서식을 제거하는 커스텀 QTextEdit
+class PlainTextPasteEdit(QTextEdit):
+    def insertFromMimeData(self, source):
+        if source.hasText():
+            text = source.text()
+            text = text.replace('\r\n', ' ').replace('\n', ' ').replace('\r', ' ')
+            self.insertPlainText(text)
+        else:
+            super().insertFromMimeData(source)
+
 
 class MainWindow(QWidget):
     def __init__(self, access_token=None):
@@ -68,9 +80,11 @@ class MainWindow(QWidget):
         self.input_widgets['product_name_label'] = QLabel("1. 물품(용역)명:")
         self.input_widgets['product_name_input'] = QLineEdit()
         self.input_widgets['spec_example_label'] = QLabel("2. 규격 예시:")
-        self.input_widgets['spec_example_input'] = QTextEdit()
+
+        # 커스텀 위젯 적용
+        self.input_widgets['spec_example_input'] = PlainTextPasteEdit()
         self.input_widgets['spec_example_input'].setFixedHeight(80)
-        self.input_widgets['spec_example_input'].setAcceptRichText(False)
+
         self.input_widgets['model_name_label'] = QLabel("3. 모델명:")
         self.input_widgets['model_name_input'] = QLineEdit()
 
