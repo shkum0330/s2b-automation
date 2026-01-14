@@ -44,7 +44,7 @@ public class MemberService {
         String email = jwtProvider.getSubjectFromToken(refreshToken);
 
         RefreshToken storedRefreshToken = refreshTokenService.getRefreshToken(email)
-                .orElseThrow(() -> NotFoundException.entityNotFound("Refresh Token"));
+                .orElseThrow(() -> AuthenticationException.unauthenticatedToken("서버에 저장된 리프레시 토큰이 없습니다. 재로그인이 필요합니다."));
 
         if (!refreshTokenService.validateRefreshToken(email, refreshToken.substring(7))) {
             refreshTokenService.removeRefreshToken(storedRefreshToken);

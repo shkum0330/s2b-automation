@@ -1,6 +1,7 @@
 package com.backend.global.exception;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -25,6 +26,13 @@ public class GlobalExceptionHandler {
                 "message", "요청 검증에 실패했습니다.",
                 "errors", errors
         );
+    }
+
+    @ExceptionHandler(BaseException.class)
+    public ResponseEntity<ErrorResult> handleBaseException(BaseException ex) {
+        return ResponseEntity
+                .status(ex.getStatusCode())
+                .body(new ErrorResult(HttpStatus.valueOf(ex.getStatusCode().value()), ex.getMessage()));
     }
 
     @ExceptionHandler(InsufficientCreditException.class)

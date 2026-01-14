@@ -9,8 +9,8 @@ from config import BASE_URL
 
 
 class MainWindow(QWidget):
-    # 로그아웃 요청 시그널
     logout_requested = pyqtSignal()
+    token_refreshed_signal = pyqtSignal()
 
     def __init__(self, access_token=None, session=None):
         super().__init__()
@@ -79,7 +79,6 @@ class MainWindow(QWidget):
         self.input_widgets['product_name_label'] = QLabel("1. 물품(용역)명:")
         self.input_widgets['product_name_input'] = QLineEdit()
         self.input_widgets['spec_example_label'] = QLabel("2. 규격 예시:")
-
 
         self.input_widgets['spec_example_input'] = QTextEdit()
         self.input_widgets['spec_example_input'].setFixedHeight(80)
@@ -199,38 +198,32 @@ class MainWindow(QWidget):
     def update_access_token(self, new_token):
         print(f"♻️ [MainWindow] Access Token이 갱신되었습니다.")
         self.access_token = new_token
+        self.token_refreshed_signal.emit()
 
-    # 세션 만료 시 호출
     def handle_session_expired(self):
         QMessageBox.warning(self, "세션 만료", "로그인 세션이 만료되었습니다.\n다시 로그인해주세요.")
         self.logout_requested.emit()
 
-    # [추가] 로그아웃 처리
     def handle_manual_logout(self):
         url = f"{BASE_URL}/api/v1/auth/logout"
         headers = {"Authorization": self.access_token}
 
-        # 로그아웃 요청 (Fire and forget)
         self.worker = ApiWorker('POST', url, headers=headers, session=self.session)
         self.worker.start()
 
         QMessageBox.information(self, "로그아웃", "성공적으로 로그아웃되었습니다.")
         self.logout_requested.emit()
 
-    # ApiWorker 실행 공통 메서드 (Session, Signal 연결 포함)
     def _run_api_worker(self, worker_attr_name, method, url, callback, payload=None, timeout=65):
         headers = {"Authorization": self.access_token}
         if payload:
             headers["Content-Type"] = "application/json"
 
-        # session 객체를 전달하여 쿠키 유지
         worker = ApiWorker(method, url, payload=payload, headers=headers, timeout=timeout, session=self.session)
 
-        # 시그널 연결
         worker.token_refreshed.connect(self.update_access_token)
         worker.session_expired.connect(self.handle_session_expired)
         worker.finished.connect(callback)
-
         setattr(self, worker_attr_name, worker)
         worker.start()
 
@@ -240,13 +233,10 @@ class MainWindow(QWidget):
             model_name = self.input_widgets['model_name_input'].text()
             spec_example = self.input_widgets['spec_example_input'].toPlainText()
             product_name_example = self.input_widgets['product_name_example_input'].text()
-
             if not model_name or not spec_example:
                 QMessageBox.warning(self, "입력 오류", "모델명과 규격 예시는 반드시 입력해야 합니다.")
                 return
-
             url = f'{BASE_URL}/api/v1/generation/generate-spec'
-
             payload = {"modelName": model_name, "specExample": spec_example, "productNameExample": product_name_example}
         else:
             product_name = self.input_widgets['product_name_input'].text()
@@ -262,7 +252,6 @@ class MainWindow(QWidget):
         self.status_label.setText("상태: 🤖 작업 시작 요청 중...")
         self.clear_outputs()
 
-        # session 및 retry 로직 적용
         self._run_api_worker('worker', 'POST', url, self.handle_task_start_response, payload=payload)
 
     def handle_api_result(self, result):
