@@ -88,7 +88,7 @@ public class JwtProvider {
         }
     }
 
-    // [수정] 리플렉션 제거 및 정적 팩토리 메서드 사용
+    // 리플렉션 제거 및 정적 팩토리 메서드 사용
     public Authentication getAuthentication(String token) {
         Claims claims = getClaims(token);
         String email = claims.getSubject();
