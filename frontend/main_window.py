@@ -1,11 +1,13 @@
+import sys
 import pyperclip
 from PyQt5.QtWidgets import (QWidget, QLabel, QLineEdit, QTextEdit,
                              QPushButton, QVBoxLayout, QGroupBox, QGridLayout,
-                             QMessageBox, QHBoxLayout, QRadioButton, QFrame)
+                             QMessageBox, QHBoxLayout, QRadioButton, QFrame, QApplication)
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QFont
 from api_worker import ApiWorker
 from config import BASE_URL
+from auto_input_manager import AutoInputManager
 
 
 # 붙여넣기 시 줄바꿈을 공백으로 치환하고 서식을 제거하는 커스텀 QTextEdit
@@ -28,6 +30,8 @@ class MainWindow(QWidget):
         self.current_task_id = None
         self.polling_timer = QTimer(self)
         self.polling_timer.timeout.connect(self.check_task_status)
+
+        self.input_manager = AutoInputManager()
 
         self.input_widgets = {}
         self.output_widgets = {}
@@ -120,8 +124,6 @@ class MainWindow(QWidget):
             if isinstance(output_field, QTextEdit):
                 output_field.setFixedHeight(80)
 
-            # output_field.setReadOnly(True)
-
             copy_button = QPushButton("복사")
             copy_button.setFixedWidth(100)
             copy_button.clicked.connect(lambda _, w=output_field: self.copy_to_clipboard(w))
@@ -143,7 +145,7 @@ class MainWindow(QWidget):
 
         response_group.setLayout(res_layout)
 
-        action_group = QGroupBox("2. 실행")
+        action_group = QGroupBox("실행 (AI 생성)")
         action_group.setFont(default_font)
         self.run_button = QPushButton("🚀 AI로 결과 생성하기")
         self.cancel_button = QPushButton("❌ 취소")
@@ -162,16 +164,34 @@ class MainWindow(QWidget):
         action_layout.addWidget(self.status_label)
         action_group.setLayout(action_layout)
 
+        auto_input_group = QGroupBox("정보 자동 입력")
+        auto_input_group.setFont(default_font)
+
+        self.auto_input_button = QPushButton("자동 입력")
+        self.auto_input_button.setFont(default_font)
+        # self.auto_input_button.setFixedWidth(200) # 필요시 크기 고정
+
+        auto_input_layout = QHBoxLayout()
+        auto_input_layout.addWidget(self.auto_input_button)
+        auto_input_group.setLayout(auto_input_layout)
+
+        # 전체 레이아웃 구성
         main_layout = QVBoxLayout(self)
         main_layout.addLayout(top_layout)
         main_layout.addWidget(request_group)
         main_layout.addWidget(action_group)
         main_layout.addWidget(response_group)
+        main_layout.addWidget(auto_input_group)
+
+        # 이벤트 연결
         self.run_button.clicked.connect(self.start_api_call)
         self.cancel_button.clicked.connect(self.cancel_api_call)
-        self.setWindowTitle("S2B 상품 정보 AI 생성기")
 
-        self.setGeometry(300, 300, 840, 800)
+        # 자동 입력 이벤트 연결
+        self.auto_input_button.clicked.connect(self.request_auto_input)
+
+        self.setWindowTitle("S2B 상품 정보 AI 생성기")
+        self.setGeometry(300, 300, 840, 900)
 
     def _update_ui_for_product_type(self):
         is_electronic = self.radio_electronic.isChecked()
@@ -345,3 +365,38 @@ class MainWindow(QWidget):
         text = text_widget.text() if isinstance(text_widget, QLineEdit) else text_widget.toPlainText()
         if text:
             pyperclip.copy(text)
+
+
+    def request_auto_input(self):
+        """자동 입력 시작 요청"""
+        # 사용자 안내 (이미지 인식 주의사항)
+        msg = QMessageBox()
+        msg.setIcon(QMessageBox.Information)
+        msg.setWindowTitle("이미지 인식 자동 입력")
+        msg.setText(
+            "이미지 인식을 시작합니다.\n\n[준비사항]\n1. 'frontend/images' 폴더에 라벨 이미지(productName.png 등)가 있어야 합니다.\n2. [OK]를 누르고 3초 내에 웹 브라우저를 띄워주세요.\n\n준비되셨습니까?")
+        msg.setStandardButtons(QMessageBox.Ok | QMessageBox.Cancel)
+        if msg.exec_() != QMessageBox.Ok:
+            return
+
+        # 현재 화면의 데이터 수집
+        input_data = {}
+        for key, widgets in self.output_widgets.items():
+            # 화면에 보이는 항목만 수집
+            if widgets['field'].isVisible():
+                text = widgets['field'].text() if isinstance(widgets['field'], QLineEdit) else widgets[
+                    'field'].toPlainText()
+                input_data[key] = text
+
+        # 매니저에게 작업 위임 (UI 업데이트 콜백 전달)
+        QApplication.processEvents()
+
+        try:
+            self.input_manager.start_input(input_data, status_callback=self.update_macro_status)
+        except Exception as e:
+            QMessageBox.critical(self, "오류", f"자동 입력 중 오류 발생: {e}")
+
+    def update_macro_status(self, message):
+        """매니저로부터 상태 메시지를 받아 UI 라벨 갱신"""
+        self.status_label.setText(f"상태: {message}")
+        QApplication.processEvents()  # UI 즉시 갱신
