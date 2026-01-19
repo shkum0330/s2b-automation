@@ -30,15 +30,17 @@ class AutoInputManager:
                 return
             time.sleep(0.1)
 
+
         target_keys = [
             "productName",  # 1. 물품명
             "specification",  # 2. 규격
             "modelName",  # 3. 모델명
-            "manufacturer",  # 4. 제조사
-            "countryOfOrigin",  # 5. 원산지
-            "katsCertificationNumber",  # 6. 전기용품 인증
-            "kcCertificationNumber",  # 7. 방송통신 인증
-            "g2bClassificationNumber"  # 8. 물품목록번호
+            "price",  # 4. 제시금액
+            "manufacturer",  # 5. 제조사
+            "countryOfOrigin",  # 6. 원산지
+            "katsCertificationNumber",  # 7. 전기용품 인증
+            "kcCertificationNumber",  # 8. 방송통신 인증
+            "g2bClassificationNumber"  # 9. 물품목록번호
         ]
 
         if status_callback:
@@ -48,20 +50,38 @@ class AutoInputManager:
         last_successful_key = None
 
         for key in target_keys:
-            # 중단 체크
+            # 1. 중단 체크
             if keyboard.is_pressed('esc'):
                 if status_callback: status_callback("🛑 정지됨")
                 return
 
             value = data_dict.get(key, "")
 
+            # 제시금액 처리
+            if key == "price" and last_successful_key == "modelName":
+                if status_callback: status_callback(f"⌨️ '{key}' (Tab 이동)")
+
+                pyautogui.press('tab')
+                time.sleep(0.1)
+
+                if value:
+                    self._overwrite_text(value)
+
+                # 값이 있든 없든 위치는 이동했으므로 체인 유지
+                last_successful_key = key
+                time.sleep(0.5)
+                continue
+
+            #  모델명 처리
             if key == "modelName" and last_successful_key == "specification":
+                # 모델명 값이 있는 경우
                 if value:
                     if status_callback: status_callback(f"⌨️ '{key}' (Tab x2 이동)")
-                    pyautogui.press('tab', presses=2, interval=0.1)  # Tab 2번
+                    pyautogui.press('tab', presses=2, interval=0.1)
                     time.sleep(0.1)
                     self._overwrite_text(value)
 
+                #  모델명 값이 없는 경우
                 else:
                     if status_callback: status_callback(f"⌨️ '{key}' 없음 (Tab x1 이동)")
                     pyautogui.press('tab')
@@ -71,8 +91,8 @@ class AutoInputManager:
                 last_successful_key = key
                 time.sleep(0.5)
                 continue
-            # -----------------------------------------------------------
 
+            # 일반적인 빈 값 체크
             if not value or "가격비교" in value:
                 last_successful_key = None  # 체인 끊김
                 continue
@@ -80,7 +100,7 @@ class AutoInputManager:
             if key == "specification" and last_successful_key == "productName":
                 if status_callback: status_callback(f"⌨️ '{key}' (Tab 이동)")
 
-                pyautogui.press('tab')  # Tab 1번
+                pyautogui.press('tab')
                 time.sleep(0.2)
                 self._overwrite_text(value)
 
@@ -88,8 +108,10 @@ class AutoInputManager:
                 time.sleep(0.5)
                 continue
 
+            # 이미지 인식
             img_path = os.path.join(self.image_dir, f"{key}.png")
             if not os.path.exists(img_path):
+                # 이미지가 없으면 로그만 남기고 체인 끊음
                 last_successful_key = None
                 continue
 

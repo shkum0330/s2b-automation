@@ -9,7 +9,6 @@ from api_worker import ApiWorker
 from config import BASE_URL
 from auto_input_manager import AutoInputManager
 
-
 # 붙여넣기 시 줄바꿈을 공백으로 치환하고 서식을 제거하는 커스텀 QTextEdit
 class PlainTextPasteEdit(QTextEdit):
     def insertFromMimeData(self, source):
@@ -65,7 +64,7 @@ class MainWindow(QWidget):
         self.refresh_button.setFont(default_font)
         self.refresh_button.clicked.connect(self.update_credit_display)
 
-        # --- 수직 구분선 ---
+        # 수직 구분선
         separator = QFrame()
         separator.setFrameShape(QFrame.VLine)  # 수직선 모양
         separator.setFrameShadow(QFrame.Sunken)  # 약간의 음영 효과
@@ -112,10 +111,15 @@ class MainWindow(QWidget):
         res_layout = QGridLayout()
 
         output_widget_info = [
-            ("productName", "1. 물품(용역)명:"), ("specification", "2. 규격(사양, 용량 등):"),
-            ("modelName", "3. 모델명:"), ("manufacturer", "4. 제조사:"),
-            ("countryOfOrigin", "5. 원산지:"), ("katsCertificationNumber", "6. 전기용품 인증정보:"),
-            ("kcCertificationNumber", "7. 방송통신기자재 인증정보:"), ("g2bClassificationNumber", "8. G2B 물품목록번호:")
+            ("productName", "1. 물품(용역)명:"),
+            ("specification", "2. 규격(사양, 용량 등):"),
+            ("modelName", "3. 모델명:"),
+            ("price", "4. 제시금액:"),
+            ("manufacturer", "5. 제조사:"),
+            ("countryOfOrigin", "6. 원산지:"),
+            ("katsCertificationNumber", "7. 전기용품 인증정보:"),
+            ("kcCertificationNumber", "8. 방송통신기자재 인증정보:"),
+            ("g2bClassificationNumber", "9. G2B 물품목록번호:")
         ]
 
         for key, label_text in output_widget_info:
@@ -135,7 +139,7 @@ class MainWindow(QWidget):
             self.output_widgets[key] = {'label': label, 'field': output_field, 'button': copy_button}
 
         row = 0
-        for key in self.output_widgets.keys():
+        for key in [k for k, _ in output_widget_info]: # 순서 보장을 위해 리스트 컴프리헨션 사용
             widgets = self.output_widgets[key]
             align = Qt.AlignTop if isinstance(widgets['field'], QTextEdit) else Qt.AlignLeft
             res_layout.addWidget(widgets['label'], row, 0, align)
@@ -191,7 +195,7 @@ class MainWindow(QWidget):
         self.auto_input_button.clicked.connect(self.request_auto_input)
 
         self.setWindowTitle("S2B 상품 정보 AI 생성기")
-        self.setGeometry(300, 300, 840, 900)
+        self.setGeometry(300, 300, 840, 950) # 세로 길이 조금 더 늘림
 
     def _update_ui_for_product_type(self):
         is_electronic = self.radio_electronic.isChecked()
@@ -203,6 +207,7 @@ class MainWindow(QWidget):
         self.input_widgets['product_name_label'].setVisible(not is_electronic)
         self.input_widgets['product_name_input'].setVisible(not is_electronic)
 
+        # 전자제품일 때만 보이는 항목들
         self.output_widgets['modelName']['label'].setVisible(is_electronic)
         self.output_widgets['modelName']['field'].setVisible(is_electronic)
         self.output_widgets['modelName']['button'].setVisible(is_electronic)
@@ -216,8 +221,16 @@ class MainWindow(QWidget):
         self.output_widgets['g2bClassificationNumber']['field'].setVisible(is_electronic)
         self.output_widgets['g2bClassificationNumber']['button'].setVisible(is_electronic)
 
-        self.output_widgets['manufacturer']['label'].setText("4. 제조사:" if is_electronic else "3. 제조사:")
-        self.output_widgets['countryOfOrigin']['label'].setText("5. 원산지:" if is_electronic else "4. 원산지:")
+        # 제품 유형에 따른 라벨 번호 및 가시성 동적 변경
+        if is_electronic:
+            self.output_widgets['price']['label'].setText("4. 제시금액:")
+            self.output_widgets['manufacturer']['label'].setText("5. 제조사:")
+            self.output_widgets['countryOfOrigin']['label'].setText("6. 원산지:")
+        else:
+            # 비전자제품일 경우 모델명이 빠지므로 번호를 당김
+            self.output_widgets['price']['label'].setText("3. 제시금액:")
+            self.output_widgets['manufacturer']['label'].setText("4. 제조사:")
+            self.output_widgets['countryOfOrigin']['label'].setText("5. 원산지:")
 
     def start_api_call(self):
         is_electronic = self.radio_electronic.isChecked()
