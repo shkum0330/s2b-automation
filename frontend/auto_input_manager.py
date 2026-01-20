@@ -30,6 +30,9 @@ class AutoInputManager:
                 return
             time.sleep(0.1)
 
+        # 작업 시작 전 화면 최상단으로 이동
+        pyautogui.press('home')
+        time.sleep(1.0)
 
         target_keys = [
             "productName",  # 1. 물품명
@@ -57,6 +60,21 @@ class AutoInputManager:
 
             value = data_dict.get(key, "")
 
+            # 제조사 입력
+            if key == "manufacturer" and last_successful_key == "price":
+                if status_callback: status_callback(f"⌨️ '{key}' (Tab x5 이동)")
+
+
+                pyautogui.press('tab', presses=5, interval=0.05)
+                time.sleep(0.1)  # 이동 후 잠깐 대기
+
+                if value:
+                    self._overwrite_text(value)
+
+                last_successful_key = key
+                time.sleep(0.5)
+                continue
+
             # 제시금액 처리
             if key == "price" and last_successful_key == "modelName":
                 if status_callback: status_callback(f"⌨️ '{key}' (Tab 이동)")
@@ -72,7 +90,6 @@ class AutoInputManager:
                 time.sleep(0.5)
                 continue
 
-            #  모델명 처리
             if key == "modelName" and last_successful_key == "specification":
                 # 모델명 값이 있는 경우
                 if value:
@@ -81,7 +98,7 @@ class AutoInputManager:
                     time.sleep(0.1)
                     self._overwrite_text(value)
 
-                #  모델명 값이 없는 경우
+                # 모델명 값이 없는 경우
                 else:
                     if status_callback: status_callback(f"⌨️ '{key}' 없음 (Tab x1 이동)")
                     pyautogui.press('tab')
@@ -92,11 +109,13 @@ class AutoInputManager:
                 time.sleep(0.5)
                 continue
 
-            # 일반적인 빈 값 체크
+
+            # 빈 값 체크
             if not value or "가격비교" in value:
                 last_successful_key = None  # 체인 끊김
                 continue
 
+            # 규격 (specification) 처리 로직
             if key == "specification" and last_successful_key == "productName":
                 if status_callback: status_callback(f"⌨️ '{key}' (Tab 이동)")
 
@@ -108,7 +127,7 @@ class AutoInputManager:
                 time.sleep(0.5)
                 continue
 
-            # 이미지 인식
+            # 이미지 인식 (productName 및 체인 끊긴 항목들)
             img_path = os.path.join(self.image_dir, f"{key}.png")
             if not os.path.exists(img_path):
                 # 이미지가 없으면 로그만 남기고 체인 끊음
