@@ -30,6 +30,10 @@ class AutoInputManager:
                 return
             time.sleep(0.1)
 
+        # 브라우저 활성화를 위해 화면 중앙 클릭
+        pyautogui.click(self.primary_width // 2, self.primary_height // 2)
+        time.sleep(0.5)
+
         # 작업 시작 전 화면 최상단으로 이동
         pyautogui.press('home')
         time.sleep(1.0)
