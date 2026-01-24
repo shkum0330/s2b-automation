@@ -9,6 +9,7 @@ from api_worker import ApiWorker
 from config import BASE_URL
 from auto_input_manager import AutoInputManager
 
+
 # 붙여넣기 시 줄바꿈을 공백으로 치환하고 서식을 제거하는 커스텀 QTextEdit
 class PlainTextPasteEdit(QTextEdit):
     def insertFromMimeData(self, source):
@@ -34,6 +35,9 @@ class MainWindow(QWidget):
 
         self.input_widgets = {}
         self.output_widgets = {}
+
+        # [수정] 창을 항상 최상위에 고정 (다른 창을 눌러도 뒤로 가지 않음)
+        self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint)
 
         self.initUI()
         self.update_credit_display()
@@ -139,7 +143,7 @@ class MainWindow(QWidget):
             self.output_widgets[key] = {'label': label, 'field': output_field, 'button': copy_button}
 
         row = 0
-        for key in [k for k, _ in output_widget_info]: # 순서 보장을 위해 리스트 컴프리헨션 사용
+        for key in [k for k, _ in output_widget_info]:  # 순서 보장을 위해 리스트 컴프리헨션 사용
             widgets = self.output_widgets[key]
             align = Qt.AlignTop if isinstance(widgets['field'], QTextEdit) else Qt.AlignLeft
             res_layout.addWidget(widgets['label'], row, 0, align)
@@ -195,7 +199,7 @@ class MainWindow(QWidget):
         self.auto_input_button.clicked.connect(self.request_auto_input)
 
         self.setWindowTitle("S2B 상품 정보 AI 생성기")
-        self.setGeometry(300, 300, 840, 950) # 세로 길이 조금 더 늘림
+        self.setGeometry(300, 300, 840, 950)  # 세로 길이 조금 더 늘림
 
     def _update_ui_for_product_type(self):
         is_electronic = self.radio_electronic.isChecked()
@@ -378,7 +382,6 @@ class MainWindow(QWidget):
         text = text_widget.text() if isinstance(text_widget, QLineEdit) else text_widget.toPlainText()
         if text:
             pyperclip.copy(text)
-
 
     def request_auto_input(self):
         """자동 입력 시작 요청"""
