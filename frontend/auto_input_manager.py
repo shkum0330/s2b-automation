@@ -4,8 +4,6 @@ import os
 import pyautogui
 import pyperclip
 import keyboard
-import traceback
-
 
 class AutoInputManager:
     def __init__(self):
@@ -51,7 +49,8 @@ class AutoInputManager:
             "manufacturer",
             "countryOfOrigin",
             "katsCertificationNumber",
-            "kcCertificationNumber"
+            "kcCertificationNumber",
+            "g2bClassificationNumber"
         ]
 
         if status_callback: status_callback("🚀 입력 시작...")
@@ -113,6 +112,24 @@ class AutoInputManager:
                 else:
                     if status_callback: status_callback(f"⚠️ {step_name} 헤더 없음")
 
+                time.sleep(0.1)
+                continue
+
+            # G2B 물품목록번호
+            if key == "g2bClassificationNumber" and last_successful_key == "kcCertificationNumber":
+                # Tab 3번 이동 (입력창 진입)
+                pyautogui.press('tab', presses=3, interval=0.2)
+                time.sleep(0.2)
+
+                # 값 입력
+                if value:
+                    self._overwrite_text(value)
+
+                pyautogui.press('tab')
+                time.sleep(0.2)  # 포커스 이동 대기
+                pyautogui.press('enter')
+
+                last_successful_key = key
                 time.sleep(0.1)
                 continue
 
@@ -228,9 +245,22 @@ class AutoInputManager:
 
     def _overwrite_text(self, text):
         if keyboard.is_pressed('esc'): return
+
+        # 내용을 클립보드에 복사
+        pyperclip.copy(str(text))
+        time.sleep(0.3)
+
+        # 전체 선택 (Ctrl+A)
         pyautogui.hotkey(self.ctrl_key, 'a')
         time.sleep(0.1)
+
+        # 3. 삭제
         pyautogui.press('backspace')
         time.sleep(0.1)
-        pyperclip.copy(text)
-        pyautogui.hotkey(self.ctrl_key, 'v')
+
+        # 4. 붙여넣기 (Ctrl+V)
+        pyautogui.keyDown(self.ctrl_key)
+        pyautogui.press('v')
+        pyautogui.keyUp(self.ctrl_key)
+
+        time.sleep(0.1)
