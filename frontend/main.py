@@ -21,7 +21,7 @@ class MainController:
     def show_login_window(self):
         self.login_win.show()
 
-    # LoginWindow에서 받은 auth_code로 백엔드에 최종 로그인 요청
+    # LoginWindow에서 받은 auth_code로 백엔드에 로그인 요청
     def process_login(self, auth_code):
         url = f"{BASE_URL}/api/v1/auth/callback/kakao?code={auth_code}"
         self.api_worker = ApiWorker('GET', url)

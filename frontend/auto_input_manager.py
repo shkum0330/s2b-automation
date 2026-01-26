@@ -4,6 +4,8 @@ import os
 import pyautogui
 import pyperclip
 import keyboard
+import traceback
+
 
 class AutoInputManager:
     def __init__(self):
@@ -16,7 +18,7 @@ class AutoInputManager:
         self.click_offset_y = -30
 
         self.primary_width, self.primary_height = pyautogui.size()
-        pyautogui.PAUSE = 0.005
+        pyautogui.PAUSE = 0.01
 
     def start_input(self, data_dict, status_callback=None):
         if status_callback:
@@ -28,11 +30,19 @@ class AutoInputManager:
                 return
             time.sleep(0.1)
 
-        pyautogui.click(self.primary_width // 2, self.primary_height // 2)
+        center_x = self.primary_width // 2
+        safe_x = center_x + 1100
+        safe_y = self.primary_height // 2
+
+        if safe_x >= self.primary_width:
+            safe_x = self.primary_width - 100
+
+        pyautogui.click(safe_x, safe_y)
         time.sleep(0.1)
         pyautogui.press('home')
         time.sleep(0.5)
 
+        # 입력 순서 리스트
         target_keys = [
             "productName",
             "specification",
@@ -40,7 +50,8 @@ class AutoInputManager:
             "price",
             "manufacturer",
             "countryOfOrigin",
-            "katsCertificationNumber"
+            "katsCertificationNumber",
+            "kcCertificationNumber"
         ]
 
         if status_callback: status_callback("🚀 입력 시작...")
@@ -53,62 +64,52 @@ class AutoInputManager:
                 return
 
             value = data_dict.get(key, "")
-            print(f"[DEBUG] 처리 중: {key}")
 
-            if key == "katsCertificationNumber":
-                step_name = "전기용품"
+            if key in ["katsCertificationNumber", "kcCertificationNumber"]:
 
-                header_img = "katsCertificationNumber.png"
-                header_path = os.path.join(self.image_dir, header_img)
+                if key == "katsCertificationNumber":
+                    step_name = "전기용품"
+                    anchor_img = "header_child.png"
+                else:
+                    step_name = "방송통신"
+                    anchor_img = "header_living.png"
 
-                header_loc = self._scroll_and_find_header(header_path)
+                anchor_path = os.path.join(self.image_dir, anchor_img)
 
-                if header_loc:
-                    print(f"[DEBUG] {step_name} 헤더 발견: {header_loc}")
+                if status_callback: status_callback(f"🔍 {step_name} 위치 찾는 중...")
+                anchor_loc = self._scroll_and_find_header(anchor_path)
 
-                    region_y = max(0, int(header_loc.y - 185))
-                    search_region = (0, region_y, self.primary_width, 100)
-
+                if anchor_loc:
                     target_x = None
                     target_y = None
                     is_regist = False
 
+                    # 좌표 계산
                     if value and value.strip():
-                        target_img = "kats_radio_regist.png"
                         is_regist = True
-
-                        btn_loc = self._locate_center(target_img, region=search_region, confidence=0.6, grayscale=True)
-
-                        if btn_loc:
-                            target_x = btn_loc.x - 80
-                            target_y = btn_loc.y
-                        else:
-                            target_x = header_loc.x + 130
-                            target_y = header_loc.y - 185
+                        target_x = anchor_loc.x + 145
+                        target_y = anchor_loc.y + 115
                     else:
-                        target_img = "kats_radio_none.png"
-
-                        btn_loc = self._locate_center(target_img, region=search_region, confidence=0.6, grayscale=True)
-
-                        if btn_loc:
-                            target_x = btn_loc.x - 115
-                            target_y = btn_loc.y
+                        if key == "kcCertificationNumber":
+                            target_x = anchor_loc.x + 733
+                            target_y = anchor_loc.y + 118
                         else:
-                            target_x = header_loc.x + 270
-                            target_y = header_loc.y - 185
+                            target_x = anchor_loc.x + 735
+                            target_y = anchor_loc.y + 120
 
+                    # 4. 클릭 및 입력 수행
                     if target_x and target_y:
-                        if status_callback: status_callback(f"⚡ {step_name} 클릭 수행")
+                        if status_callback: status_callback(f"⚡ {step_name} 클릭")
                         pyautogui.click(target_x, target_y)
+                        time.sleep(1.0)
 
                         if is_regist:
                             self._perform_input_sequence(value)
                             if status_callback: status_callback(f"✅ {step_name} 등록 완료")
                         else:
-                            if status_callback: status_callback(f"✅ {step_name} 대상 아님 선택")
+                            if status_callback: status_callback(f"✅ {step_name} 대상 아님")
 
                         last_successful_key = key
-
                 else:
                     if status_callback: status_callback(f"⚠️ {step_name} 헤더 없음")
 
@@ -166,25 +167,26 @@ class AutoInputManager:
         if status_callback:
             status_callback("✅ 완료")
 
-    # 입력 시퀀스 (Tab -> 지우기 -> 입력 -> 등록)
+    # 입력 시퀀스
     def _perform_input_sequence(self, text):
-        pyautogui.press('tab', presses=2, interval=0.1)
-
-        time.sleep(0.2)
-
+        pyautogui.press('tab', presses=2, interval=0.2)
         self._overwrite_text(text)
         pyautogui.press('tab')
-        time.sleep(0.1)
+        time.sleep(0.2)
         pyautogui.press('enter')
 
+    # 스마트 스크롤 헤더 탐색
     def _scroll_and_find_header(self, img_path):
-        if not os.path.exists(img_path): return None
+        if not os.path.exists(img_path):
+            return None
+
         for i in range(4):
             loc = self._locate_center(img_path, grayscale=False, confidence=0.7)
             if loc: return loc
             loc = self._locate_center(img_path, grayscale=True, confidence=0.7)
             if loc: return loc
-            pyautogui.scroll(-400)
+
+            pyautogui.scroll(-1000)
             time.sleep(0.5)
         return None
 
@@ -226,15 +228,9 @@ class AutoInputManager:
 
     def _overwrite_text(self, text):
         if keyboard.is_pressed('esc'): return
-
-        # 1. 전체 선택 (Ctrl+A)
         pyautogui.hotkey(self.ctrl_key, 'a')
-        time.sleep(0.1)  # 씹힘 방지 딜레이
-
-        # 2. 삭제 (Backspace) - 기존 값 제거
+        time.sleep(0.1)
         pyautogui.press('backspace')
         time.sleep(0.1)
-
-        # 3. 붙여넣기 (Ctrl+V)
         pyperclip.copy(text)
         pyautogui.hotkey(self.ctrl_key, 'v')
