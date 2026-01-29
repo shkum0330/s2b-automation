@@ -21,6 +21,4 @@ public class MemberController {
         MemberResponseDto memberInfo = memberService.getMemberInfo(memberDetails.member());
         return ResponseEntity.ok(memberInfo);
     }
-
-
 }

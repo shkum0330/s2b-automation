@@ -2,6 +2,7 @@ package com.backend.domain.generation.service.impl;
 
 import com.backend.global.exception.GenerateApiException;
 import com.backend.global.util.PromptBuilder;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
@@ -33,24 +34,29 @@ public class GeminiService extends AbstractGenerationService {
         super(promptBuilder, objectMapper, webClient);
     }
 
+    // 요청 body  구조화를 위한 Record 클래스 정의
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private record GeminiRequest(List<Content> contents, GenerationConfig generationConfig, List<Tool> tools) {}
+    private record Content(List<Part> parts) {}
+    private record Part(String text) {}
+    private record GenerationConfig(double temperature, int maxOutputTokens) {}
+    private record Tool(Map<String, Object> google_search) {} // Google Search 툴 구조
+
     @Override
     protected String getApiUrl() {
         return apiUrl + "?key=" + apiKey;
     }
 
     @Override
-    protected HttpEntity<Map<String, Object>> createRequestEntity(String prompt) {
-        Map<String, Object> generationConfig = Map.of(
-                "temperature", temperature,
-                "maxOutputTokens", maxOutputTokens
-        );
+    protected HttpEntity<Object> createRequestEntity(String prompt) { // 제네릭 타입 Object로 변경
+        GenerationConfig config = new GenerationConfig(temperature, maxOutputTokens);
+        Content content = new Content(List.of(new Part(prompt)));
+        Tool googleSearch = new Tool(Map.of()); // 빈 맵이면 google_search 활성화
 
-        Map<String, Object> googleSearchTool = Map.of("google_search", Map.of());
-
-        Map<String, Object> requestBody = Map.of(
-                "contents", List.of(Map.of("parts", List.of(Map.of("text", prompt)))),
-                "generationConfig", generationConfig,
-                "tools", List.of(googleSearchTool)
+        GeminiRequest requestBody = new GeminiRequest(
+                List.of(content),
+                config,
+                List.of(googleSearch)
         );
 
         HttpHeaders headers = new HttpHeaders();

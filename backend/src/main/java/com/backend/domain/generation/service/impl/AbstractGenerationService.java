@@ -14,7 +14,6 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
 import reactor.util.retry.Retry;
 
 import java.time.Duration;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 @RequiredArgsConstructor
@@ -43,7 +42,8 @@ public abstract class AbstractGenerationService implements AiProviderService {
     }
 
     private <T> CompletableFuture<T> fetchFromAi(String prompt, Class<T> clazz) {
-        HttpEntity<Map<String, Object>> requestEntity = createRequestEntity(prompt);
+        HttpEntity<Object> requestEntity = createRequestEntity(prompt);
+
         return webClient.post()
                 .uri(getApiUrl())
                 .headers(headers -> headers.addAll(requestEntity.getHeaders()))
@@ -68,6 +68,6 @@ public abstract class AbstractGenerationService implements AiProviderService {
     }
 
     protected abstract String getApiUrl();
-    protected abstract HttpEntity<Map<String, Object>> createRequestEntity(String prompt);
+    protected abstract HttpEntity<Object> createRequestEntity(String prompt);
     protected abstract String extractTextFromResponse(String jsonResponse) throws Exception;
 }

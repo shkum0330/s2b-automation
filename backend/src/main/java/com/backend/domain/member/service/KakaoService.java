@@ -73,10 +73,10 @@ public class KakaoService {
         forceLogin(kakaoUser);
 
         // 5. JWT 토큰 생성 및 응답 헤더 설정
-        String accessToken = jwtProvider.createAccessToken(kakaoUser.getEmail(), kakaoUser.getRole());
+        String accessToken = jwtProvider.createAccessToken(kakaoUser.getEmail(), kakaoUser.getRole(), kakaoUser.getMemberId());
         response.addHeader(JwtProvider.AUTHORIZATION_HEADER, accessToken);
 
-        String refreshToken = jwtProvider.createRefreshToken(kakaoUser.getEmail(), kakaoUser.getRole());
+        String refreshToken = jwtProvider.createRefreshToken(kakaoUser.getEmail(), kakaoUser.getRole(),kakaoUser.getMemberId());
         jwtProvider.addJwtToCookie(refreshToken, response);
 
         refreshTokenService.insertRefreshToken(kakaoUser.getEmail(), refreshToken.substring(7));

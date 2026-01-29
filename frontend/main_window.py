@@ -1,11 +1,26 @@
+import sys
 import pyperclip
 from PyQt5.QtWidgets import (QWidget, QLabel, QLineEdit, QTextEdit,
                              QPushButton, QVBoxLayout, QGroupBox, QGridLayout,
-                             QMessageBox, QHBoxLayout, QRadioButton, QFrame)  # QFrame 추가
+                             QMessageBox, QHBoxLayout, QRadioButton, QFrame, QApplication)
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QFont
 from api_worker import ApiWorker
 from config import BASE_URL
+from auto_input_manager import AutoInputManager
+
+
+# 붙여넣기 시 줄바꿈을 공백으로 치환하고 서식을 제거하는 커스텀 QTextEdit
+class PlainTextPasteEdit(QTextEdit):
+    def insertFromMimeData(self, source):
+        if source.hasText():
+            text = source.text()
+            # 줄바꿈 문자를 공백으로 변경하여 단어가 붙지 않도록 함
+            text = text.replace('\r\n', ' ').replace('\n', ' ').replace('\r', ' ')
+            self.insertPlainText(text)
+        else:
+            super().insertFromMimeData(source)
+
 
 class MainWindow(QWidget):
     def __init__(self, access_token=None):
@@ -16,8 +31,13 @@ class MainWindow(QWidget):
         self.polling_timer = QTimer(self)
         self.polling_timer.timeout.connect(self.check_task_status)
 
+        self.input_manager = AutoInputManager()
+
         self.input_widgets = {}
         self.output_widgets = {}
+
+        # [수정] 창을 항상 최상위에 고정 (다른 창을 눌러도 뒤로 가지 않음)
+        self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint)
 
         self.initUI()
         self.update_credit_display()
@@ -48,7 +68,7 @@ class MainWindow(QWidget):
         self.refresh_button.setFont(default_font)
         self.refresh_button.clicked.connect(self.update_credit_display)
 
-        # --- 수직 구분선 ---
+        # 수직 구분선
         separator = QFrame()
         separator.setFrameShape(QFrame.VLine)  # 수직선 모양
         separator.setFrameShadow(QFrame.Sunken)  # 약간의 음영 효과
@@ -68,9 +88,11 @@ class MainWindow(QWidget):
         self.input_widgets['product_name_label'] = QLabel("1. 물품(용역)명:")
         self.input_widgets['product_name_input'] = QLineEdit()
         self.input_widgets['spec_example_label'] = QLabel("2. 규격 예시:")
-        self.input_widgets['spec_example_input'] = QTextEdit()
+
+        # 커스텀 위젯 적용 (붙여넣기 시 줄바꿈 제거)
+        self.input_widgets['spec_example_input'] = PlainTextPasteEdit()
         self.input_widgets['spec_example_input'].setFixedHeight(80)
-        self.input_widgets['spec_example_input'].setAcceptRichText(False)
+
         self.input_widgets['model_name_label'] = QLabel("3. 모델명:")
         self.input_widgets['model_name_input'] = QLineEdit()
 
@@ -93,10 +115,15 @@ class MainWindow(QWidget):
         res_layout = QGridLayout()
 
         output_widget_info = [
-            ("productName", "1. 물품(용역)명:"), ("specification", "2. 규격(사양, 용량 등):"),
-            ("modelName", "3. 모델명:"), ("manufacturer", "4. 제조사:"),
-            ("countryOfOrigin", "5. 원산지:"), ("katsCertificationNumber", "6. 전기용품 인증정보:"),
-            ("kcCertificationNumber", "7. 방송통신기자재 인증정보:"), ("g2bClassificationNumber", "8. G2B 물품목록번호:")
+            ("productName", "1. 물품(용역)명:"),
+            ("specification", "2. 규격(사양, 용량 등):"),
+            ("modelName", "3. 모델명:"),
+            ("price", "4. 제시금액:"),
+            ("manufacturer", "5. 제조사:"),
+            ("countryOfOrigin", "6. 원산지:"),
+            ("katsCertificationNumber", "7. 전기용품 인증정보:"),
+            ("kcCertificationNumber", "8. 방송통신기자재 인증정보:"),
+            ("g2bClassificationNumber", "9. G2B 물품목록번호:")
         ]
 
         for key, label_text in output_widget_info:
@@ -104,7 +131,7 @@ class MainWindow(QWidget):
             output_field = QLineEdit() if key != "specification" else QTextEdit()
             if isinstance(output_field, QTextEdit):
                 output_field.setFixedHeight(80)
-            output_field.setReadOnly(True)
+
             copy_button = QPushButton("복사")
             copy_button.setFixedWidth(100)
             copy_button.clicked.connect(lambda _, w=output_field: self.copy_to_clipboard(w))
@@ -116,7 +143,7 @@ class MainWindow(QWidget):
             self.output_widgets[key] = {'label': label, 'field': output_field, 'button': copy_button}
 
         row = 0
-        for key in self.output_widgets.keys():
+        for key in [k for k, _ in output_widget_info]:  # 순서 보장을 위해 리스트 컴프리헨션 사용
             widgets = self.output_widgets[key]
             align = Qt.AlignTop if isinstance(widgets['field'], QTextEdit) else Qt.AlignLeft
             res_layout.addWidget(widgets['label'], row, 0, align)
@@ -126,7 +153,7 @@ class MainWindow(QWidget):
 
         response_group.setLayout(res_layout)
 
-        action_group = QGroupBox("2. 실행")
+        action_group = QGroupBox("실행 (AI 생성)")
         action_group.setFont(default_font)
         self.run_button = QPushButton("🚀 AI로 결과 생성하기")
         self.cancel_button = QPushButton("❌ 취소")
@@ -145,16 +172,34 @@ class MainWindow(QWidget):
         action_layout.addWidget(self.status_label)
         action_group.setLayout(action_layout)
 
+        auto_input_group = QGroupBox("정보 자동 입력")
+        auto_input_group.setFont(default_font)
+
+        self.auto_input_button = QPushButton("자동 입력")
+        self.auto_input_button.setFont(default_font)
+        # self.auto_input_button.setFixedWidth(200) # 필요시 크기 고정
+
+        auto_input_layout = QHBoxLayout()
+        auto_input_layout.addWidget(self.auto_input_button)
+        auto_input_group.setLayout(auto_input_layout)
+
+        # 전체 레이아웃 구성
         main_layout = QVBoxLayout(self)
         main_layout.addLayout(top_layout)
         main_layout.addWidget(request_group)
         main_layout.addWidget(action_group)
         main_layout.addWidget(response_group)
+        main_layout.addWidget(auto_input_group)
+
+        # 이벤트 연결
         self.run_button.clicked.connect(self.start_api_call)
         self.cancel_button.clicked.connect(self.cancel_api_call)
-        self.setWindowTitle("S2B 상품 정보 AI 생성기")
 
-        self.setGeometry(300, 300, 840, 800)
+        # 자동 입력 이벤트 연결
+        self.auto_input_button.clicked.connect(self.request_auto_input)
+
+        self.setWindowTitle("S2B 상품 정보 AI 생성기")
+        self.setGeometry(300, 300, 840, 950)  # 세로 길이 조금 더 늘림
 
     def _update_ui_for_product_type(self):
         is_electronic = self.radio_electronic.isChecked()
@@ -166,6 +211,7 @@ class MainWindow(QWidget):
         self.input_widgets['product_name_label'].setVisible(not is_electronic)
         self.input_widgets['product_name_input'].setVisible(not is_electronic)
 
+        # 전자제품일 때만 보이는 항목들
         self.output_widgets['modelName']['label'].setVisible(is_electronic)
         self.output_widgets['modelName']['field'].setVisible(is_electronic)
         self.output_widgets['modelName']['button'].setVisible(is_electronic)
@@ -179,8 +225,16 @@ class MainWindow(QWidget):
         self.output_widgets['g2bClassificationNumber']['field'].setVisible(is_electronic)
         self.output_widgets['g2bClassificationNumber']['button'].setVisible(is_electronic)
 
-        self.output_widgets['manufacturer']['label'].setText("4. 제조사:" if is_electronic else "3. 제조사:")
-        self.output_widgets['countryOfOrigin']['label'].setText("5. 원산지:" if is_electronic else "4. 원산지:")
+        # 제품 유형에 따른 라벨 번호 및 가시성 동적 변경
+        if is_electronic:
+            self.output_widgets['price']['label'].setText("4. 제시금액:")
+            self.output_widgets['manufacturer']['label'].setText("5. 제조사:")
+            self.output_widgets['countryOfOrigin']['label'].setText("6. 원산지:")
+        else:
+            # 비전자제품일 경우 모델명이 빠지므로 번호를 당김
+            self.output_widgets['price']['label'].setText("3. 제시금액:")
+            self.output_widgets['manufacturer']['label'].setText("4. 제조사:")
+            self.output_widgets['countryOfOrigin']['label'].setText("5. 원산지:")
 
     def start_api_call(self):
         is_electronic = self.radio_electronic.isChecked()
@@ -328,3 +382,37 @@ class MainWindow(QWidget):
         text = text_widget.text() if isinstance(text_widget, QLineEdit) else text_widget.toPlainText()
         if text:
             pyperclip.copy(text)
+
+    def request_auto_input(self):
+        """자동 입력 시작 요청"""
+        # 사용자 안내 (이미지 인식 주의사항)
+        msg = QMessageBox()
+        msg.setIcon(QMessageBox.Information)
+        msg.setWindowTitle("이미지 인식 자동 입력")
+        msg.setText(
+            "이미지 인식을 시작합니다.\n\n[준비사항]\n1. 'frontend/images' 폴더에 라벨 이미지(productName.png 등)가 있어야 합니다.\n2. [OK]를 누르고 3초 내에 웹 브라우저를 띄워주세요.\n\n준비되셨습니까?")
+        msg.setStandardButtons(QMessageBox.Ok | QMessageBox.Cancel)
+        if msg.exec_() != QMessageBox.Ok:
+            return
+
+        # 현재 화면의 데이터 수집
+        input_data = {}
+        for key, widgets in self.output_widgets.items():
+            # 화면에 보이는 항목만 수집
+            if widgets['field'].isVisible():
+                text = widgets['field'].text() if isinstance(widgets['field'], QLineEdit) else widgets[
+                    'field'].toPlainText()
+                input_data[key] = text
+
+        # 매니저에게 작업 위임 (UI 업데이트 콜백 전달)
+        QApplication.processEvents()
+
+        try:
+            self.input_manager.start_input(input_data, status_callback=self.update_macro_status)
+        except Exception as e:
+            QMessageBox.critical(self, "오류", f"자동 입력 중 오류 발생: {e}")
+
+    def update_macro_status(self, message):
+        """매니저로부터 상태 메시지를 받아 UI 라벨 갱신"""
+        self.status_label.setText(f"상태: {message}")
+        QApplication.processEvents()  # UI 즉시 갱신

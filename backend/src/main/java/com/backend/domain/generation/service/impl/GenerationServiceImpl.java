@@ -7,7 +7,6 @@ import com.backend.domain.generation.service.ScrapingService;
 import com.backend.domain.log.event.GenerationLogEvent;
 import com.backend.domain.member.entity.Member;
 import com.backend.domain.member.service.MemberService;
-import com.backend.global.exception.InsufficientCreditException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -31,10 +30,7 @@ public class GenerationServiceImpl implements GenerationService {
 
     @Override
     public CompletableFuture<GenerateElectronicResponse> generateSpec(GenerateElectronicRequest request, Member member) {
-
-        if (member.getCredit() <= 0) {
-            throw new InsufficientCreditException(member.getCredit());
-        }
+        memberService.decrementCredit(member.getMemberId());
 
         String model = request.getModelName();
         String specExample = request.getSpecExample();
@@ -59,44 +55,37 @@ public class GenerationServiceImpl implements GenerationService {
                     return mainSpec;
                 }, taskExecutor);
 
+
         combinedFuture.whenCompleteAsync((result, throwable) -> {
-            handleCreditDeduction(member, throwable, "전자제품");
+            if (throwable != null) {
+                // 실패 시 보상 트랜잭션 실행
+                log.warn("전자제품 생성 실패. 크레딧 환불 진행. memberId={}", member.getMemberId(), throwable);
+                memberService.restoreCredit(member.getMemberId());
+            }
 
+            // 로그 이벤트 발행
             eventPublisher.publishEvent(new GenerationLogEvent(member, request, result, throwable));
-
         }, taskExecutor);
+
         return combinedFuture;
     }
 
     @Override
     public CompletableFuture<GenerateNonElectronicResponse> generateGeneralSpec(GenerateNonElectronicRequest request, Member member) {
-        if (member.getCredit() <= 0) {
-            throw new InsufficientCreditException(member.getCredit());
-        }
+        memberService.decrementCredit(member.getMemberId());
 
         String productName = request.getProductName();
         String specExample = request.getSpecExample();
 
         CompletableFuture<GenerateNonElectronicResponse> future = aiProviderService.fetchGeneralSpec(productName, specExample);
+
         future.whenCompleteAsync((result, throwable) -> {
-            handleCreditDeduction(member, throwable, "비전자제품");
-
+            if (throwable != null) {
+                log.warn("비전자제품 생성 실패. 크레딧 환불 진행. memberId={}", member.getMemberId(), throwable);
+                memberService.restoreCredit(member.getMemberId());
+            }
             eventPublisher.publishEvent(new GenerationLogEvent(member, request, result, throwable));
-
         }, taskExecutor);
         return future;
-    }
-
-    private void handleCreditDeduction(Member member, Throwable throwable, String type) {
-        if (throwable == null) {
-            try {
-                memberService.decrementCredit(member.getMemberId());
-                log.info("{} 생성 성공. 사용자(ID: {}) 크레딧 차감.", type, member.getMemberId());
-            } catch (Exception e) {
-                log.error("{} 생성 성공 후 크레딧 차감 중 에러 발생. 사용자 ID: {}", type, member.getMemberId(), e);
-            }
-        } else {
-            log.warn("{} 생성 실패로 사용자(ID: {}) 크레딧을 차감하지 않았습니다.", type, member.getMemberId(), throwable);
-        }
     }
 }

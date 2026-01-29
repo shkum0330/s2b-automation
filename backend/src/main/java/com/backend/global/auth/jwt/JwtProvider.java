@@ -1,6 +1,8 @@
 package com.backend.global.auth.jwt;
 
+import com.backend.domain.member.entity.Member;
 import com.backend.domain.member.entity.Role;
+import com.backend.global.auth.entity.MemberDetails;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
@@ -10,6 +12,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
@@ -48,22 +52,22 @@ public class JwtProvider {
         return null;
     }
 
-
-    public String createAccessToken(String email, Role role) {
+    public String createAccessToken(String email, Role role, Long memberId) {
         return BEARER_PREFIX + Jwts.builder()
                 .setSubject(email)
                 .setExpiration(new Date(System.currentTimeMillis() + JWT_TOKEN_EXPIRATION_TIME))
                 .claim("role", role)
+                .claim("memberId", memberId)
                 .setIssuedAt(new Date(System.currentTimeMillis()))
                 .signWith(key, SignatureAlgorithm.HS256)
                 .compact();
     }
 
-    public String createRefreshToken(String email, Role role) {
-
+    public String createRefreshToken(String email, Role role, Long memberId) {
         return BEARER_PREFIX + Jwts.builder()
                 .setSubject(email)
                 .claim("role", role)
+                .claim("memberId", memberId)
                 .setExpiration(new Date(System.currentTimeMillis() + (REFRESH_TOKEN_EXPIRATION_TIME)))
                 .setIssuedAt(new Date(System.currentTimeMillis()))
                 .signWith(key, SignatureAlgorithm.HS256)
@@ -72,39 +76,35 @@ public class JwtProvider {
 
     public Claims validateToken(String token) {
         String tokenValue = resolveToken(token);
-
         try {
             return Jwts.parserBuilder()
                     .setSigningKey(key)
                     .build()
                     .parseClaimsJws(tokenValue)
                     .getBody();
-        } catch (UnsupportedJwtException e) {
-            log.error("지원되지 않는 형식의 JWT 토큰입니다. Token: {}", tokenValue);
-            throw new JwtException("지원되지 않는 토큰 형식입니다.");
-        } catch (MalformedJwtException e) {
-            log.error("잘못된 형식의 JWT 토큰입니다. Token: {}", tokenValue);
-            throw new JwtException("잘못된 토큰 형식입니다.");
-        } catch (ExpiredJwtException e) {
-            log.error("만료된 JWT 토큰입니다. Token: {}", tokenValue);
-            throw new JwtException("토큰이 만료되었습니다.");
-        } catch (SignatureException e) {
-            log.error("JWT 서명이 유효하지 않습니다. Token: {}", tokenValue);
-            throw new JwtException("서명이 유효하지 않습니다.");
-        } catch (IllegalArgumentException e) {
-            log.error("JWT 토큰이 null이거나 비어있습니다. Token: {}", tokenValue);
-            throw new JwtException("토큰 값이 비어있습니다.");
+        } catch (Exception e) {
+            log.error("토큰 검증 실패: {}", e.getMessage());
+            throw new JwtException("유효하지 않은 토큰입니다.");
         }
     }
 
-    public String getSubjectFromToken(String token) {
+    // 리플렉션 제거 및 정적 팩토리 메서드 사용
+    public Authentication getAuthentication(String token) {
         Claims claims = getClaims(token);
-        return claims.getSubject();
+        String email = claims.getSubject();
+        String roleStr = claims.get("role", String.class);
+        Long memberId = claims.get("memberId", Long.class);
+
+        Role role = Role.valueOf(roleStr);
+
+        Member member = Member.createForToken(memberId, email, role);
+
+        MemberDetails principal = new MemberDetails(member);
+        return new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities());
     }
 
-    public String getRoleFromToken(String token) {
-        Claims claims = getClaims(token);
-        return claims.get("role", String.class);
+    public String getSubjectFromToken(String token) {
+        return getClaims(token).getSubject();
     }
 
     public Claims getClaims(String token) {
@@ -120,17 +120,12 @@ public class JwtProvider {
 
     public void addJwtToCookie(String token, HttpServletResponse res) {
         token = URLEncoder.encode(token, StandardCharsets.UTF_8).replaceAll("\\+", "%20");
-        Cookie cookie = new Cookie(JwtProvider.REFRESH_TOKEN_HEADER, token);
-
+        Cookie cookie = new Cookie(REFRESH_TOKEN_HEADER, token);
         cookie.setPath("/");
         cookie.setHttpOnly(true);
-        cookie.setSecure(true); // 'localhost'가 아닌 HTTPS 환경에서 테스트 시 필요
-
-        // SameSite 정책을 Lax로 변경하여 CSRF 방어 강화
+        cookie.setSecure(true);
         cookie.setAttribute("SameSite", "Lax");
-
-        int maxAgeInSeconds = 3600; // 1시간
-        cookie.setMaxAge(7 * 24 * maxAgeInSeconds);
+        cookie.setMaxAge(7 * 24 * 3600);
         res.addCookie(cookie);
     }
 
@@ -138,6 +133,6 @@ public class JwtProvider {
         if (bearerToken != null && bearerToken.startsWith("Bearer ")) {
             return bearerToken.substring(7);
         }
-        return bearerToken; // "Bearer "가 없으면 원본 반환
+        return bearerToken;
     }
 }

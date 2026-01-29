@@ -10,6 +10,7 @@ import com.backend.global.auth.jwt.JwtProvider;
 import com.backend.global.auth.refreshtoken.RefreshToken;
 import com.backend.global.auth.refreshtoken.RefreshTokenService;
 import com.backend.global.exception.AuthenticationException;
+import com.backend.global.exception.InsufficientCreditException;
 import com.backend.global.exception.NotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -52,7 +53,7 @@ public class MemberService {
         Member member = memberRepository.findByEmail(email)
                 .orElseThrow(() -> NotFoundException.entityNotFound("멤버"));
 
-        return jwtProvider.createAccessToken(email, member.getRole());
+        return jwtProvider.createAccessToken(email, member.getRole(),member.getMemberId());
     }
 
     /**
@@ -84,28 +85,36 @@ public class MemberService {
         memberRepository.save(member);
     }
 
+    /**
+     * 크레딧 차감 (선차감 적용)
+     * REQUIRES_NEW: 상위 트랜잭션과 무관하게 즉시 DB 반영
+     */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void decrementCredit(Long memberId) {
-        Member member = memberRepository.findById(memberId)
-                .orElseThrow(() -> new IllegalArgumentException("ID에 해당하는 멤버를 찾을 수 없습니다: " + memberId));
-
-        log.info("요청 전 크레딧: {}", member.getCredit());
-
-        // DB에 직접 UPDATE 쿼리 실행 (동시성 보장, 원자적 연산)
+        // 1. DB 레벨에서 원자적 차감 시도
         int updatedRows = memberRepository.decrementCreditIfPossible(memberId);
 
+        // 2. 실패 시(크레딧 0) 예외 발생 -> 컨트롤러까지 전파되어 작업 중단
         if (updatedRows == 0) {
-            throw new IllegalStateException("크레딧이 부족합니다.");
+            // 현재 크레딧 조회를 위해 예외 메시지 생성 (선택사항)
+            Member member = memberRepository.findById(memberId).orElseThrow();
+            throw new InsufficientCreditException(member.getCredit());
         }
 
-        // DB 업데이트가 성공했으므로, 메모리 상의 객체 값도 맞춰줌
-        member.decrementRequestCount();
+    }
 
-        log.info("요청 후 크레딧(DB 반영 및 메모리 동기화 완료): {}", member.getCredit());
+    /**
+     * 크레딧 복구 (작업 실패 시 환불)
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void restoreCredit(Long memberId) {
+        memberRepository.incrementCredit(memberId);
     }
 
     @Transactional(readOnly = true)
     public MemberResponseDto getMemberInfo(Member member) {
-        return new MemberResponseDto(member);
+        Member realMember = memberRepository.findById(member.getMemberId())
+                .orElseThrow(() -> NotFoundException.entityNotFound("Member"));
+        return new MemberResponseDto(realMember);
     }
 }

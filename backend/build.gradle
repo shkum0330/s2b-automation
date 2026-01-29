@@ -57,7 +57,7 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-validation'
 
     // jwt
-    compileOnly group: 'io.jsonwebtoken', name: 'jjwt-api', version: '0.11.5'
+    implementation group: 'io.jsonwebtoken', name: 'jjwt-api', version: '0.11.5'
     runtimeOnly group: 'io.jsonwebtoken', name: 'jjwt-impl', version: '0.11.5'
     runtimeOnly group: 'io.jsonwebtoken', name: 'jjwt-jackson', version: '0.11.5'
 
@@ -79,6 +79,7 @@ dependencies {
     testImplementation "com.squareup.okhttp3:mockwebserver:4.12.0"
     testImplementation 'org.springframework.boot:spring-boot-starter-webflux'
     testImplementation 'io.projectreactor:reactor-test:3.6.8'
+    testImplementation 'org.springframework.security:spring-security-test'
 }
 
 tasks.named('test') {

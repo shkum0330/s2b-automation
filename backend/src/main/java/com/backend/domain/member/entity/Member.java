@@ -81,4 +81,12 @@ public class Member extends BaseTimeEntity {
         this.credit--;
     }
 
+    public static Member createForToken(Long memberId, String email, Role role) {
+        Member member = new Member();
+        member.memberId= memberId;
+        member.email = email;
+        member.role = role;
+        return member;
+    }
+
 }
