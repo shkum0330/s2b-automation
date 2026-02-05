@@ -31,7 +31,6 @@ import java.util.List;
 public class SecurityConfig {
 
     private final JwtProvider jwtProvider;
-    // private final MemberDetailsService memberDetailsService; // [삭제] 더 이상 필터에 주입하지 않음
     private final AuthenticationConfiguration authenticationConfiguration;
 
     @Bean
@@ -41,6 +40,7 @@ public class SecurityConfig {
 
     @Bean
     public WebSecurityCustomizer webSecurityCustomizer() {
+        // 정적 리소스는 보안 필터링 자체를 거치지 않도록 설정
         return (web) -> web.ignoring()
                 .requestMatchers(PathRequest.toStaticResources().atCommonLocations())
                 .requestMatchers("/css/**", "/js/**", "/images/**", "/style.css", "/favicon.ico", "/error");
@@ -53,7 +53,7 @@ public class SecurityConfig {
         configuration.setAllowedOrigins(List.of("http://localhost:9292", "http://localhost:8080"));
         configuration.setAllowCredentials(true);
         configuration.setAllowedMethods(Arrays.asList("GET","POST","PUT", "PATCH", "DELETE", "OPTIONS"));
-        configuration.setMaxAge(60L);
+        configuration.setMaxAge(3600L); // 1시간 캐시
         configuration.addExposedHeader("Authorization");
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
@@ -63,48 +63,32 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        // 1. CSRF, CORS, 세션 관리 등 기본 설정
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .formLogin(AbstractHttpConfigurer::disable);
 
-        // 2. 요청별 권한 설정
         http
                 .authorizeHttpRequests(auth -> auth
-                        // 1. 정적 리소스 (CSS, JS, 이미지) 허용
-                        .requestMatchers(PathRequest.toStaticResources().atCommonLocations()).permitAll()
-                        .requestMatchers("/css/**", "/js/**", "/images/**").permitAll()
-
-                        // 2. OPTIONS 메서드 허용
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
                         .requestMatchers(
-                                "/",
-                                "/index.html",
-                                "/api/v1/auth/callback/kakao",
-                                "/api/v1/auth/token",
-                                "/actuator/**",
-                                "/ping",
-                                "/admin/login",
-                                "/widget/**",
-                                "/payment/**",
-                                "/brandpay/**"
+                                "/", "/index.html", "/actuator/**", "/ping",
+                                "/api/v1/auth/**",
+                                "/api/v1/payments/**",
+                                "/widget/**", "/payment/**", "/brandpay/**",
+                                "/admin/login"
                         ).permitAll()
-                        .requestMatchers("/api/v1/payments/**").permitAll()
-                        // 3. GET 요청 허용 (기존 정책 유지)
+
                         .requestMatchers(HttpMethod.GET, "/api/v1/**").permitAll()
 
-                        // 4. 어드민 대시보드 페이지는 인증 필요
-                        .requestMatchers("/admin/**").permitAll()
+                        .requestMatchers("/admin/**").hasAuthority("ADMIN")
 
-                        // 그 외 모든 요청은 인증 필요
                         .anyRequest().authenticated()
                 );
 
-        http
-                .addFilterBefore(new JwtAuthenticationFilter(jwtProvider), UsernamePasswordAuthenticationFilter.class);
+        http.addFilterBefore(new JwtAuthenticationFilter(jwtProvider), UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
 }
