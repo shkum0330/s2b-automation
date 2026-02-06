@@ -47,29 +47,21 @@ public class GenerationController {
     }
 
     @PostMapping("/generate-general-spec")
-    public ResponseEntity<?> generateGeneralSpecification(
+    public ResponseEntity<Map<String, String>> generateGeneralSpecification(
             @Valid @RequestBody GenerateNonElectronicRequest request,
             @AuthenticationPrincipal MemberDetails memberDetails) {
 
-        // 단일 AI API만 호출하는 비동기 작업
+        log.info("비전자제품 생성 요청: memberId={}, product={}", memberDetails.member().getMemberId(), request.getProductName());
+
+        // 비동기 작업 시작
         CompletableFuture<GenerateNonElectronicResponse> future = generationService.generateGeneralSpec(
                 request,
                 memberDetails.member()
         );
 
-        try {
-            GenerateNonElectronicResponse result = future.join();
-
-            // Map.of 대신 HashMap 사용 (null 허용을 위해)
-            Map<String, Object> response = new HashMap<>();
-            response.put("result", result);
-            response.put("taskId", null);
-            log.info("생성 결과: {}",result.toString());
-            return ResponseEntity.ok(response);
-
-        } catch (Exception e) {
-            throw new CompletionException(e.getCause());
-        }
+        // future.join() 대기 코드를 삭제하고, taskId를 즉시 반환하도록 수정
+        String taskId = taskService.submitTask(future);
+        return ResponseEntity.accepted().body(Map.of("taskId", taskId));
     }
 
     @GetMapping("/result/{taskId}")
