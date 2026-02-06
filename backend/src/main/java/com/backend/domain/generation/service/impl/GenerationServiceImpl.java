@@ -28,19 +28,25 @@ public class GenerationServiceImpl implements GenerationService {
     private final Executor taskExecutor;
     private final ApplicationEventPublisher eventPublisher;
 
+    // 1. 전자제품 스펙 생성
     @Override
     public CompletableFuture<GenerateElectronicResponse> generateSpec(GenerateElectronicRequest request, Member member) {
+        // 크레딧 선 차감 (낙관적 차감)
         memberService.decrementCredit(member.getMemberId());
 
         String model = request.getModelName();
         String specExample = request.getSpecExample();
         String productNameExample = request.getProductNameExample();
 
-        CompletableFuture<Optional<String>> g2bFuture = CompletableFuture.supplyAsync(() -> scrapingService.findG2bClassificationNumber(model), taskExecutor);
-        CompletableFuture<Optional<String>> countryOfOriginFuture = CompletableFuture.supplyAsync(() -> scrapingService.findCountryOfOrigin(model), taskExecutor);
+        // 외부 API 요청 병렬 실행 (Non-blocking)
+        CompletableFuture<Optional<String>> g2bFuture = CompletableFuture.supplyAsync(() ->
+                scrapingService.findG2bClassificationNumber(model), taskExecutor);
+        CompletableFuture<Optional<String>> countryFuture = CompletableFuture.supplyAsync(() ->
+                scrapingService.findCountryOfOrigin(model), taskExecutor);
         CompletableFuture<CertificationResponse> certFuture = aiProviderService.fetchCertification(model);
         CompletableFuture<GenerateElectronicResponse> mainSpecFuture = aiProviderService.fetchMainSpec(model, specExample, productNameExample);
 
+        // 각 작업이 끝나는 대로 결과에 반영되며, 모든 작업이 완료되면 최종 결과가 나옴
         CompletableFuture<GenerateElectronicResponse> combinedFuture = mainSpecFuture
                 .thenCombineAsync(certFuture, (mainSpec, cert) -> {
                     mainSpec.setCertificationNumber(cert);
@@ -50,42 +56,43 @@ public class GenerationServiceImpl implements GenerationService {
                     g2bOpt.ifPresent(mainSpec::setG2bClassificationNumber);
                     return mainSpec;
                 }, taskExecutor)
-                .thenCombineAsync(countryOfOriginFuture, (mainSpec, countryOpt) -> {
+                .thenCombineAsync(countryFuture, (mainSpec, countryOpt) -> {
                     countryOpt.ifPresent(mainSpec::setCountryOfOrigin);
                     return mainSpec;
                 }, taskExecutor);
 
-
+        // 후처리 (로깅 및 실패 시 보상 트랜잭션)
         combinedFuture.whenCompleteAsync((result, throwable) -> {
             if (throwable != null) {
-                // 실패 시 보상 트랜잭션 실행
-                log.warn("전자제품 생성 실패. 크레딧 환불 진행. memberId={}", member.getMemberId(), throwable);
+                log.warn("전자제품 생성 실패. 크레딧 환불. memberId={}, error={}", member.getMemberId(), throwable.getMessage());
+                // 실패 시 크레딧 복구
                 memberService.restoreCredit(member.getMemberId());
             }
-
-            // 로그 이벤트 발행
+            // 성공/실패 여부와 관계없이 이력 저장 (Event 발행)
             eventPublisher.publishEvent(new GenerationLogEvent(member, request, result, throwable));
         }, taskExecutor);
 
         return combinedFuture;
     }
 
+    // 2. 비전자제품 스펙 생성
     @Override
     public CompletableFuture<GenerateNonElectronicResponse> generateGeneralSpec(GenerateNonElectronicRequest request, Member member) {
+        // 크레딧 선 차감
         memberService.decrementCredit(member.getMemberId());
 
-        String productName = request.getProductName();
-        String specExample = request.getSpecExample();
+        // AI 생성 요청 (비동기)
+        CompletableFuture<GenerateNonElectronicResponse> future = aiProviderService.fetchGeneralSpec(request.getProductName(), request.getSpecExample());
 
-        CompletableFuture<GenerateNonElectronicResponse> future = aiProviderService.fetchGeneralSpec(productName, specExample);
-
+        //  후처리
         future.whenCompleteAsync((result, throwable) -> {
             if (throwable != null) {
-                log.warn("비전자제품 생성 실패. 크레딧 환불 진행. memberId={}", member.getMemberId(), throwable);
+                log.warn("비전자제품 생성 실패. 크레딧 환불. memberId={}, error={}", member.getMemberId(), throwable.getMessage());
                 memberService.restoreCredit(member.getMemberId());
             }
             eventPublisher.publishEvent(new GenerationLogEvent(member, request, result, throwable));
         }, taskExecutor);
+
         return future;
     }
 }
