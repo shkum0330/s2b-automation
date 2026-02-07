@@ -3,7 +3,6 @@ import json
 import time
 import sys
 
-
 TARGET_SERVER_URL = "http://localhost:8080/api/v1/generation/generate-spec"
 OLLAMA_API_URL = "http://localhost:11434/api/generate"
 MODEL_NAME = "llama3"

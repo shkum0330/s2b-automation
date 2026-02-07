@@ -6,7 +6,6 @@ from main_window import MainWindow
 from api_worker import ApiWorker
 from config import BASE_URL
 
-# 전체 애플리케이션의 흐름을 제어하는 메인 컨트롤러
 class MainController:
     # 컨트롤러 초기화
     def __init__(self):
@@ -54,7 +53,6 @@ class MainController:
 
         self.login_win.close()
         self.main_win.show()
-
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
