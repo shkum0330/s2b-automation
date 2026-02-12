@@ -24,6 +24,7 @@ import reactor.test.StepVerifier;
 import java.io.IOException;
 import java.time.LocalDate;
 import java.util.Map;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -68,14 +69,13 @@ class PaymentServiceTest {
 
     @BeforeEach
     void setUp() {
-        paymentRepository.deleteAll();
-        memberRepository.deleteAll();
+        String suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 12);
 
         testMember = Member.builder()
-                .email("test@example.com")
+                .email("test-" + suffix + "@example.com")
                 .name("테스트유저")
                 .provider("TEST")
-                .providerId("test-provider-id")
+                .providerId("tp-" + suffix)
                 .role(Role.FREE_USER)
                 .build();
         memberRepository.save(testMember);
@@ -130,7 +130,7 @@ class PaymentServiceTest {
         String orderName = "30일 20개 플랜";
         Payment readyPayment = paymentService.requestPayment(testMember, amount, orderName);
         String orderId = readyPayment.getOrderId();
-        String paymentKey = "test_payment_key_success";
+        String paymentKey = "test_payment_key_success_" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
 
         // 2. MockWebServer 응답 설정 (Toss API 모킹)
         String mockResponseBody = objectMapper.writeValueAsString(Map.of(

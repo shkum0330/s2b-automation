@@ -23,4 +23,12 @@ public class CacheConfig {
                 })
                 .build();
     }
+
+    @Bean
+    public Cache<String, Long> oauthStateCache() {
+        return Caffeine.newBuilder()
+                .expireAfterWrite(5, TimeUnit.MINUTES)
+                .maximumSize(10_000)
+                .build();
+    }
 }

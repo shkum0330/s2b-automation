@@ -81,7 +81,7 @@ public class PaymentService {
         }
 
         if (!Objects.equals(payment.getAmount(), amount)) {
-            payment.failPayment();
+            markPaymentAsFailed(payment);
             return Mono.error(new IllegalArgumentException("주문 금액이 일치하지 않습니다."));
         }
 
@@ -91,13 +91,19 @@ public class PaymentService {
                 "amount", amount
         );
 
-        return tossWebClient.post()
-                .uri("/v1/payments/confirm")
-                .bodyValue(body)
-                .retrieve()
-                .bodyToMono(TossConfirmResponseDto.class)
-                .flatMap(response -> validateAndApplyPayment(payment, orderId, amount, response))
-                .doOnError(error -> log.error("결제 확인 실패: {}", error.getMessage()));
+        try {
+            TossConfirmResponseDto response = tossWebClient.post()
+                    .uri("/v1/payments/confirm")
+                    .bodyValue(body)
+                    .retrieve()
+                    .bodyToMono(TossConfirmResponseDto.class)
+                    .block();
+
+            return validateAndApplyPayment(payment, orderId, amount, response);
+        } catch (Exception e) {
+            log.error("결제 확인 실패: {}", e.getMessage());
+            return Mono.error(e);
+        }
     }
 
     private Mono<TossConfirmResponseDto> validateAndApplyPayment(
@@ -107,18 +113,18 @@ public class PaymentService {
             TossConfirmResponseDto response
     ) {
         if (response == null) {
-            payment.failPayment();
-            return Mono.error(new IllegalArgumentException("결제 승인 응답이 비어 있습니다."));
+            markPaymentAsFailed(payment);
+            return Mono.error(new IllegalArgumentException("결제 확인 응답이 비어 있습니다."));
         }
 
         if (!Objects.equals(response.getOrderId(), orderId)
                 || !Objects.equals(response.getTotalAmount(), amount)) {
-            payment.failPayment();
+            markPaymentAsFailed(payment);
             return Mono.error(new IllegalArgumentException("결제 검증에 실패했습니다."));
         }
 
         if (!"DONE".equals(response.getStatus())) {
-            payment.failPayment();
+            markPaymentAsFailed(payment);
             return Mono.error(new IllegalArgumentException("결제가 완료 상태가 아닙니다."));
         }
 
@@ -128,8 +134,12 @@ public class PaymentService {
 
     private void handleSuccessfulPayment(Payment payment, TossConfirmResponseDto response) {
         payment.completePayment(response.getPaymentKey());
+        paymentRepository.save(payment);
 
-        Member member = payment.getMember();
+        Long memberId = payment.getMember().getMemberId();
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new NotFoundException("회원 정보를 찾을 수 없습니다. memberId=" + memberId));
+
         Long amount = payment.getAmount();
         Role newRole = getRoleByAmount(amount);
 
@@ -138,6 +148,11 @@ public class PaymentService {
             memberRepository.save(member);
             log.info("결제 성공: 사용자 ID={} 등급이 {}로 변경되었습니다.", member.getMemberId(), newRole);
         }
+    }
+
+    private void markPaymentAsFailed(Payment payment) {
+        payment.failPayment();
+        paymentRepository.save(payment);
     }
 
     private Role getRoleByAmount(Long amount) {
