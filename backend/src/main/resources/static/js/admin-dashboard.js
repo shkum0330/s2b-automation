@@ -1,19 +1,16 @@
 let currentPage = 0;
 const pageSize = 20;
 
-// 페이지 로드 시 자동으로 로그 조회 시작
 document.addEventListener("DOMContentLoaded", () => {
     loadLogs(0);
 });
 
-// 1. 로그 목록 조회 API 호출
 async function loadLogs(page) {
     currentPage = page;
 
-    // 검색 조건 가져오기
     const email = document.getElementById("searchEmail").value;
     const model = document.getElementById("searchModel").value;
-    const success = document.getElementById("searchSuccess").value; // ALL, true, false
+    const success = document.getElementById("searchSuccess").value;
 
     const params = {
         page: page,
@@ -24,84 +21,98 @@ async function loadLogs(page) {
     };
 
     try {
-        // 백엔드 컨트롤러 경로와 일치해야 함
-        const response = await axios.get('/api/v1/admin/log', { params });
+        const response = await axios.get("/api/v1/admin/log", { params });
         renderTable(response.data.content);
         renderPagination(response.data);
     } catch (error) {
         console.error("로그 조회 실패", error);
-        // (401, 403은 admin-common.js가 처리하므로 제외)
         if (!error.response || (error.response.status !== 401 && error.response.status !== 403)) {
             alert("데이터를 불러오지 못했습니다.");
         }
     }
 }
 
-// 2. 테이블 HTML 렌더링 (메시지 컬럼 삭제됨)
 function renderTable(logs) {
     const tbody = document.getElementById("logTableBody");
-    tbody.innerHTML = "";
+    tbody.replaceChildren();
 
     if (!logs || logs.length === 0) {
-        // 컬럼 수 5개로 변경 (ID, 사용자, 모델명, 상태, 일시)
-        tbody.innerHTML = '<tr><td colspan="5" class="text-center py-5">데이터가 없습니다.</td></tr>';
+        const row = document.createElement("tr");
+        const cell = document.createElement("td");
+        cell.colSpan = 5;
+        cell.className = "text-center py-5";
+        cell.textContent = "데이터가 없습니다.";
+        row.appendChild(cell);
+        tbody.appendChild(row);
         return;
     }
 
-    logs.forEach(log => {
-        const badgeClass = log.success ? 'text-bg-success' : 'text-bg-danger';
-        const badgeText = log.success ? '성공' : '실패';
-        // const errorMsg = log.errorMessage ? log.errorMessage : '-'; (더 이상 목록에 표시 안 함)
-        const modelName = log.modelName || '(없음)';
+    logs.forEach((log) => {
+        const row = document.createElement("tr");
+        row.style.cursor = "pointer";
+        row.addEventListener("click", () => showDetail(log.generationLogId));
 
-        const row = `
-            <tr style="cursor: pointer;" onclick="showDetail(${log.generationLogId})">
-                <td>${log.generationLogId}</td>
-                <td>${log.memberEmail}</td>
-                <td class="fw-bold">${modelName}</td>
-                <td><span class="badge ${badgeClass}">${badgeText}</span></td>
-                <td>${formatDate(log.createdAt)}</td>
-            </tr>
-        `;
-        tbody.innerHTML += row;
+        const idCell = document.createElement("td");
+        idCell.textContent = String(log.generationLogId ?? "");
+
+        const emailCell = document.createElement("td");
+        emailCell.textContent = log.memberEmail ?? "";
+
+        const modelCell = document.createElement("td");
+        modelCell.classList.add("fw-bold");
+        modelCell.textContent = log.modelName || "(없음)";
+
+        const statusCell = document.createElement("td");
+        const statusBadge = document.createElement("span");
+        statusBadge.className = `badge ${log.success ? "text-bg-success" : "text-bg-danger"}`;
+        statusBadge.textContent = log.success ? "성공" : "실패";
+        statusCell.appendChild(statusBadge);
+
+        const createdAtCell = document.createElement("td");
+        createdAtCell.textContent = formatDate(log.createdAt);
+
+        row.appendChild(idCell);
+        row.appendChild(emailCell);
+        row.appendChild(modelCell);
+        row.appendChild(statusCell);
+        row.appendChild(createdAtCell);
+        tbody.appendChild(row);
     });
 }
 
-// 3. 상세 정보 모달 띄우기
 async function showDetail(id) {
     try {
         const response = await axios.get(`/api/v1/admin/log/${id}`);
         const log = response.data;
 
-        // 모달 데이터 채우기
         document.getElementById("detailId").textContent = log.generationLogId;
-        document.getElementById("detailResult").innerHTML = !log.errorMessage
-            ? '<span class="badge text-bg-success">성공</span>'
-            : '<span class="badge text-bg-danger">실패</span>';
 
-        // JSON 예쁘게 보여주기 (Pretty Print)
+        const detailResult = document.getElementById("detailResult");
+        detailResult.replaceChildren();
+        const statusBadge = document.createElement("span");
+        statusBadge.className = !log.errorMessage ? "badge text-bg-success" : "badge text-bg-danger";
+        statusBadge.textContent = !log.errorMessage ? "성공" : "실패";
+        detailResult.appendChild(statusBadge);
+
         document.getElementById("detailRequest").textContent = tryFormatJson(log.requestBody);
         document.getElementById("detailResponse").textContent = log.responseBody ? tryFormatJson(log.responseBody) : "(응답 없음)";
 
-        // 에러 메시지
         const errorBox = document.getElementById("detailErrorBox");
         if (log.errorMessage) {
             errorBox.classList.remove("d-none");
             document.getElementById("detailError").textContent = log.errorMessage;
         } else {
             errorBox.classList.add("d-none");
+            document.getElementById("detailError").textContent = "";
         }
 
-        // Bootstrap 모달 실행
-        new bootstrap.Modal(document.getElementById('detailModal')).show();
-
+        new bootstrap.Modal(document.getElementById("detailModal")).show();
     } catch (error) {
         console.error(error);
         alert("상세 정보를 불러오지 못했습니다.");
     }
 }
 
-// JSON 포맷팅 유틸리티
 function tryFormatJson(str) {
     try {
         return JSON.stringify(JSON.parse(str), null, 2);
@@ -110,51 +121,57 @@ function tryFormatJson(str) {
     }
 }
 
-// 날짜 포맷팅 유틸리티
 function formatDate(isoString) {
-    if (!isoString) return '-';
+    if (!isoString) {
+        return "-";
+    }
     const date = new Date(isoString);
-    return date.toLocaleString('ko-KR', {
-        month: '2-digit', day: '2-digit',
-        hour: '2-digit', minute: '2-digit', second: '2-digit'
+    return date.toLocaleString("ko-KR", {
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit"
     });
 }
 
-// 4. 페이징 버튼 렌더링
+function createPageItem(label, page, disabled = false, active = false) {
+    const li = document.createElement("li");
+    li.className = `page-item${disabled ? " disabled" : ""}${active ? " active" : ""}`;
+
+    const a = document.createElement("a");
+    a.className = "page-link";
+    a.href = "#";
+    a.textContent = label;
+    a.addEventListener("click", (event) => {
+        event.preventDefault();
+        if (!disabled) {
+            loadLogs(page);
+        }
+    });
+
+    li.appendChild(a);
+    return li;
+}
+
 function renderPagination(pageData) {
     const pagination = document.getElementById("pagination");
-    pagination.innerHTML = "";
+    pagination.replaceChildren();
 
     const totalPages = pageData.totalPages;
     const curr = pageData.number;
 
-    if (totalPages <= 1) return;
+    if (totalPages <= 1) {
+        return;
+    }
 
-    // [이전]
-    const prevDisabled = pageData.first ? "disabled" : "";
-    pagination.innerHTML += `
-        <li class="page-item ${prevDisabled}">
-            <a class="page-link" href="#" onclick="loadLogs(${curr - 1})">이전</a>
-        </li>
-    `;
+    pagination.appendChild(createPageItem("이전", curr - 1, pageData.first));
 
-    // [번호] (현재 페이지 앞뒤로 2개씩만 표시)
     for (let i = 0; i < totalPages; i++) {
         if (i >= curr - 2 && i <= curr + 2) {
-            const active = i === curr ? "active" : "";
-            pagination.innerHTML += `
-                <li class="page-item ${active}">
-                    <a class="page-link" href="#" onclick="loadLogs(${i})">${i + 1}</a>
-                </li>
-            `;
+            pagination.appendChild(createPageItem(String(i + 1), i, false, i === curr));
         }
     }
 
-    // [다음]
-    const nextDisabled = pageData.last ? "disabled" : "";
-    pagination.innerHTML += `
-        <li class="page-item ${nextDisabled}">
-            <a class="page-link" href="#" onclick="loadLogs(${curr + 1})">다음</a>
-        </li>
-    `;
+    pagination.appendChild(createPageItem("다음", curr + 1, pageData.last));
 }
