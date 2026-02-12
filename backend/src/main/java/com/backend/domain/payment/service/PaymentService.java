@@ -63,9 +63,9 @@ public class PaymentService {
         Payment payment = Payment.builder()
                 .member(member)
                 .amount(amount)
-                .orderName(orderName) // [추가]
+                .orderName(orderName)
                 .orderId(orderId)
-                .paymentKey(null) // 아직 승인 전이므로 null
+                .paymentKey(null)
                 .status("READY")
                 .build();
 
@@ -73,13 +73,15 @@ public class PaymentService {
     }
 
     public Mono<TossConfirmResponseDto> confirmPayment(String paymentKey, String orderId, Long amount) {
-
         Payment payment = paymentRepository.findByOrderId(orderId)
                 .orElseThrow(() -> new NotFoundException("주문 정보를 찾을 수 없습니다. orderId=" + orderId));
 
-        // 금액 검증
+        if (!"READY".equals(payment.getStatus())) {
+            return Mono.error(new IllegalArgumentException("처리 가능한 결제 상태가 아닙니다."));
+        }
+
         if (!Objects.equals(payment.getAmount(), amount)) {
-            payment.failPayment(); // 금액 불일치 시 결제 중단 처리
+            payment.failPayment();
             return Mono.error(new IllegalArgumentException("주문 금액이 일치하지 않습니다."));
         }
 
@@ -89,28 +91,44 @@ public class PaymentService {
                 "amount", amount
         );
 
-        // 승인 API 호출
         return tossWebClient.post()
                 .uri("/v1/payments/confirm")
                 .bodyValue(body)
                 .retrieve()
                 .bodyToMono(TossConfirmResponseDto.class)
-                .doOnSuccess(response -> {
-                    if (response != null && "DONE".equals(response.getStatus())) {
-                        handleSuccessfulPayment(payment, response);
-                    }
-                })
-                .doOnError(error -> {
-                    log.error("결제 승인 실패: {}", error.getMessage());
-                    // 필요하다면 여기서 결제 실패 상태로 업데이트
-                });
+                .flatMap(response -> validateAndApplyPayment(payment, orderId, amount, response))
+                .doOnError(error -> log.error("결제 확인 실패: {}", error.getMessage()));
+    }
+
+    private Mono<TossConfirmResponseDto> validateAndApplyPayment(
+            Payment payment,
+            String orderId,
+            Long amount,
+            TossConfirmResponseDto response
+    ) {
+        if (response == null) {
+            payment.failPayment();
+            return Mono.error(new IllegalArgumentException("결제 승인 응답이 비어 있습니다."));
+        }
+
+        if (!Objects.equals(response.getOrderId(), orderId)
+                || !Objects.equals(response.getTotalAmount(), amount)) {
+            payment.failPayment();
+            return Mono.error(new IllegalArgumentException("결제 검증에 실패했습니다."));
+        }
+
+        if (!"DONE".equals(response.getStatus())) {
+            payment.failPayment();
+            return Mono.error(new IllegalArgumentException("결제가 완료 상태가 아닙니다."));
+        }
+
+        handleSuccessfulPayment(payment, response);
+        return Mono.just(response);
     }
 
     private void handleSuccessfulPayment(Payment payment, TossConfirmResponseDto response) {
-        // 결제 정보 업데이트
         payment.completePayment(response.getPaymentKey());
 
-        // 멤버십 적용
         Member member = payment.getMember();
         Long amount = payment.getAmount();
         Role newRole = getRoleByAmount(amount);
@@ -118,14 +136,20 @@ public class PaymentService {
         if (newRole != null) {
             member.updateMembership(newRole, SUBSCRIPTION_DAYS);
             memberRepository.save(member);
-            log.info("결제 성공: 사용자(ID={}) 등급이 {}로 변경되었습니다.", member.getMemberId(), newRole);
+            log.info("결제 성공: 사용자 ID={} 등급이 {}로 변경되었습니다.", member.getMemberId(), newRole);
         }
     }
 
     private Role getRoleByAmount(Long amount) {
-        if (amount == 29900L) return Role.PLAN_30K;
-        if (amount == 49900L) return Role.PLAN_50K;
-        if (amount == 100000L) return Role.PLAN_100K;
+        if (amount == 29900L) {
+            return Role.PLAN_30K;
+        }
+        if (amount == 49900L) {
+            return Role.PLAN_50K;
+        }
+        if (amount == 100000L) {
+            return Role.PLAN_100K;
+        }
         return null;
     }
 

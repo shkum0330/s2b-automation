@@ -76,9 +76,13 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/", "/index.html", "/actuator/**", "/ping",
                                 "/api/v1/auth/**",
-                                "/api/v1/payments/**",
                                 "/widget/**", "/payment/**", "/brandpay/**",
                                 "/admin/login"
+                        ).permitAll()
+
+                        .requestMatchers(HttpMethod.POST,
+                                "/api/v1/payments/confirm/widget",
+                                "/api/v1/payments/confirm/payment"
                         ).permitAll()
 
                         .requestMatchers(HttpMethod.GET, "/api/v1/**").permitAll()
