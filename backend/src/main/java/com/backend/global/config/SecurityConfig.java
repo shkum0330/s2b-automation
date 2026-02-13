@@ -74,18 +74,23 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
                         .requestMatchers(
-                                "/", "/index.html", "/actuator/**", "/ping",
+                                "/", "/index.html", "/ping",
+                                "/actuator/health", "/actuator/health/**",
                                 "/api/v1/auth/**",
                                 "/widget/**", "/payment/**", "/brandpay/**",
                                 "/admin/login"
+                        ).permitAll()
+
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/v1/payments/success",
+                                "/api/v1/payments/fail",
+                                "/api/v1/payments/"
                         ).permitAll()
 
                         .requestMatchers(HttpMethod.POST,
                                 "/api/v1/payments/confirm/widget",
                                 "/api/v1/payments/confirm/payment"
                         ).permitAll()
-
-                        .requestMatchers(HttpMethod.GET, "/api/v1/**").permitAll()
 
                         .requestMatchers("/admin/**").hasAuthority("ADMIN")
 
