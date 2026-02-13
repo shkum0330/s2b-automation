@@ -9,6 +9,7 @@ import com.backend.global.util.PromptBuilder;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpEntity;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
@@ -17,6 +18,7 @@ import reactor.util.retry.Retry;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 
+@Slf4j
 @RequiredArgsConstructor
 public abstract class AbstractGenerationService implements AiProviderService {
 
@@ -47,6 +49,7 @@ public abstract class AbstractGenerationService implements AiProviderService {
     }
 
     private <T> CompletableFuture<T> fetchFromAi(String prompt, Class<T> clazz) {
+        final long requestStartNanos = System.nanoTime();
         HttpEntity<Object> requestEntity = createRequestEntity(prompt);
 
         return webClient.post()
@@ -58,8 +61,34 @@ public abstract class AbstractGenerationService implements AiProviderService {
                 .retryWhen(
                         Retry.backoff(3, Duration.ofSeconds(2))
                                 .filter(WebClientResponseException.class::isInstance)
+                                .doBeforeRetry(retrySignal -> log.warn(
+                                        "AI 호출 재시도: responseType={}, retry={}, elapsedMs={}, error={}",
+                                        clazz.getSimpleName(),
+                                        retrySignal.totalRetries() + 1,
+                                        elapsedMillis(requestStartNanos),
+                                        rootMessage(retrySignal.failure())
+                                ))
                 )
-                .map(jsonResponse -> parseResponse(jsonResponse, clazz))
+                .map(jsonResponse -> {
+                    log.info(
+                            "AI 응답 수신: responseType={}, elapsedMs={}, bodyLength={}",
+                            clazz.getSimpleName(),
+                            elapsedMillis(requestStartNanos),
+                            jsonResponse == null ? 0 : jsonResponse.length()
+                    );
+                    return parseResponse(jsonResponse, clazz);
+                })
+                .doOnSuccess(result -> log.info(
+                        "AI 파싱 완료: responseType={}, elapsedMs={}",
+                        clazz.getSimpleName(),
+                        elapsedMillis(requestStartNanos)
+                ))
+                .doOnError(error -> log.warn(
+                        "AI 호출/파싱 실패: responseType={}, elapsedMs={}, error={}",
+                        clazz.getSimpleName(),
+                        elapsedMillis(requestStartNanos),
+                        rootMessage(error)
+                ))
                 .toFuture();
     }
 
@@ -137,6 +166,24 @@ public abstract class AbstractGenerationService implements AiProviderService {
         }
 
         throw new GenerateApiException("AI 응답에서 완전한 JSON 객체를 찾지 못했습니다.");
+    }
+
+    private long elapsedMillis(long startNanos) {
+        return (System.nanoTime() - startNanos) / 1_000_000L;
+    }
+
+    private String rootMessage(Throwable throwable) {
+        if (throwable == null) {
+            return "(no error)";
+        }
+
+        Throwable root = throwable;
+        while (root.getCause() != null) {
+            root = root.getCause();
+        }
+
+        String message = root.getMessage();
+        return root.getClass().getSimpleName() + ": " + (message == null ? "(no message)" : message);
     }
 
     protected abstract String getApiUrl();
