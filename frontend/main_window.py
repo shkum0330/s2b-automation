@@ -1,9 +1,8 @@
-import sys
 import pyperclip
 from PyQt5.QtWidgets import (QWidget, QLabel, QLineEdit, QTextEdit,
                              QPushButton, QVBoxLayout, QGroupBox, QGridLayout,
-                             QMessageBox, QHBoxLayout, QRadioButton, QFrame, QApplication)
-from PyQt5.QtCore import Qt, QTimer
+                             QMessageBox, QHBoxLayout, QRadioButton, QFrame)
+from PyQt5.QtCore import Qt, QThread, QTimer, pyqtSignal
 from PyQt5.QtGui import QFont
 from api_worker import ApiWorker
 from config import BASE_URL
@@ -21,11 +20,32 @@ class PlainTextPasteEdit(QTextEdit):
             super().insertFromMimeData(source)
 
 
+class AutoInputWorker(QThread):
+    """자동 입력 로직을 UI 스레드와 분리해 화면 멈춤을 방지한다."""
+    status_changed = pyqtSignal(str)
+    error_occurred = pyqtSignal(str)
+
+    def __init__(self, input_manager, input_data):
+        super().__init__()
+        self.input_manager = input_manager
+        self.input_data = input_data
+
+    def run(self):
+        try:
+            self.input_manager.start_input(
+                self.input_data,
+                status_callback=self.status_changed.emit,
+            )
+        except Exception as exc:
+            self.error_occurred.emit(str(exc))
+
+
 class MainWindow(QWidget):
     def __init__(self, access_token=None):
         super().__init__()
         self.access_token = access_token
         self.worker = None
+        self.auto_input_worker = None
         self.current_task_id = None
         self.polling_timer = QTimer(self)
         self.polling_timer.timeout.connect(self.check_task_status)
@@ -298,7 +318,7 @@ class MainWindow(QWidget):
                 for field, msg in json_response['errors'].items():
                     detailed_errors.append(f"- {field}: {msg}")
                 error_message += "\n\n[상세 내용]\n" + "\n".join(detailed_errors)
-            self.handle_error(result.get('json', {}).get('message', result.get('error', '알 수 없는 오류')))
+            self.handle_error(error_message)
 
             return
 
@@ -394,14 +414,29 @@ class MainWindow(QWidget):
                     'field'].toPlainText()
                 input_data[key] = text
 
-        QApplication.processEvents()
+        if self.auto_input_worker and self.auto_input_worker.isRunning():
+            QMessageBox.information(self, "안내", "자동 입력이 이미 실행 중입니다.")
+            return
 
-        try:
-            self.input_manager.start_input(input_data, status_callback=self.update_macro_status)
-        except Exception as e:
-            QMessageBox.critical(self, "오류", f"자동 입력 중 오류 발생: {e}")
+        self.auto_input_button.setEnabled(False)
+        self.auto_input_button.setText("자동 입력 실행 중...")
+        self.auto_input_worker = AutoInputWorker(self.input_manager, input_data)
+        self.auto_input_worker.status_changed.connect(self.update_macro_status)
+        self.auto_input_worker.error_occurred.connect(self.handle_auto_input_error)
+        self.auto_input_worker.finished.connect(self.handle_auto_input_finished)
+        self.auto_input_worker.start()
+
+    def handle_auto_input_error(self, error_message):
+        """자동 입력 스레드에서 전달된 오류를 사용자에게 노출한다."""
+        self.status_label.setText("상태: ❌ 자동 입력 오류 발생")
+        QMessageBox.critical(self, "오류", f"자동 입력 중 오류 발생: {error_message}")
+
+    def handle_auto_input_finished(self):
+        """자동 입력 종료 후 UI 상태를 원복한다."""
+        self.auto_input_button.setEnabled(True)
+        self.auto_input_button.setText("자동 입력")
+        self.auto_input_worker = None
 
     def update_macro_status(self, message):
         """매니저로부터 상태 메시지를 받아 UI 라벨 갱신"""
         self.status_label.setText(f"상태: {message}")
-        QApplication.processEvents()

@@ -3,6 +3,8 @@ from PyQt5.QtWidgets import QDialog, QVBoxLayout, QMessageBox
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 from PyQt5.QtCore import QUrl, pyqtSignal
 
+from config import PAYMENT_CHECKOUT_URL
+
 
 class PaymentWindow(QDialog):
     payment_success = pyqtSignal()
@@ -22,8 +24,7 @@ class PaymentWindow(QDialog):
         self.webview = QWebEngineView()
 
         # 백엔드 결제 페이지 로드
-        backend_url = "http://localhost:8080/payment/checkout.html"
-        self.webview.setUrl(QUrl(backend_url))
+        self.webview.setUrl(QUrl(PAYMENT_CHECKOUT_URL))
 
         self.webview.loadFinished.connect(self.inject_payment_data)
         self.webview.urlChanged.connect(self.check_url)

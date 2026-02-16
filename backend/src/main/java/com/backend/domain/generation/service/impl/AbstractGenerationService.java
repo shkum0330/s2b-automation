@@ -10,13 +10,20 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientRequestException;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
+import reactor.core.publisher.Mono;
 import reactor.util.retry.Retry;
 
+import java.io.IOException;
+import java.net.ConnectException;
+import java.net.SocketTimeoutException;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeoutException;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -25,6 +32,13 @@ public abstract class AbstractGenerationService implements AiProviderService {
     protected final PromptBuilder promptBuilder;
     protected final ObjectMapper objectMapper;
     protected final WebClient webClient;
+    // 운영 환경별로 timeout/retry 튜닝이 가능하도록 프로퍼티로 분리
+    @Value("${generation.ai.request-timeout:20s}")
+    private Duration requestTimeout = Duration.ofSeconds(20);
+    @Value("${generation.ai.retry.max-attempts:1}")
+    private long retryMaxAttempts = 1;
+    @Value("${generation.ai.retry.backoff:1s}")
+    private Duration retryBackoff = Duration.ofSeconds(1);
 
     @Override
     public CompletableFuture<GenerateElectronicResponse> fetchMainSpec(
@@ -52,24 +66,30 @@ public abstract class AbstractGenerationService implements AiProviderService {
         final long requestStartNanos = System.nanoTime();
         HttpEntity<Object> requestEntity = createRequestEntity(prompt);
 
-        return webClient.post()
+        Mono<String> responseMono = webClient.post()
                 .uri(getApiUrl())
                 .headers(headers -> headers.addAll(requestEntity.getHeaders()))
                 .bodyValue(requestEntity.getBody())
                 .retrieve()
                 .bodyToMono(String.class)
-                .retryWhen(
-                        Retry.backoff(3, Duration.ofSeconds(2))
-                                .filter(WebClientResponseException.class::isInstance)
-                                .doBeforeRetry(retrySignal -> log.warn(
-                                        "AI 호출 재시도: responseType={}, retry={}, elapsedMs={}, error={}",
-                                        clazz.getSimpleName(),
-                                        retrySignal.totalRetries() + 1,
-                                        elapsedMillis(requestStartNanos),
-                                        rootMessage(retrySignal.failure())
-                                ))
-                )
-                .map(jsonResponse -> {
+                .timeout(requestTimeout);
+
+        // 4xx 전체 재시도는 오히려 지연만 늘릴 수 있어, 재시도 가치가 있는 오류만 선별
+        if (retryMaxAttempts > 0) {
+            responseMono = responseMono.retryWhen(
+                    Retry.backoff(retryMaxAttempts, retryBackoff)
+                            .filter(this::isRetryableError)
+                            .doBeforeRetry(retrySignal -> log.warn(
+                                    "AI 호출 재시도: responseType={}, retry={}, elapsedMs={}, error={}",
+                                    clazz.getSimpleName(),
+                                    retrySignal.totalRetries() + 1,
+                                    elapsedMillis(requestStartNanos),
+                                    rootMessage(retrySignal.failure())
+                            ))
+            );
+        }
+
+        return responseMono.map(jsonResponse -> {
                     log.info(
                             "AI 응답 수신: responseType={}, elapsedMs={}, bodyLength={}",
                             clazz.getSimpleName(),
@@ -90,6 +110,22 @@ public abstract class AbstractGenerationService implements AiProviderService {
                         rootMessage(error)
                 ))
                 .toFuture();
+    }
+
+    private boolean isRetryableError(Throwable throwable) {
+        Throwable root = rootCause(throwable);
+        // 서버 과부하/일시 장애(429, 5xx)만 HTTP 레벨 재시도 허용
+        if (root instanceof WebClientResponseException responseException) {
+            int statusCode = responseException.getStatusCode().value();
+            return statusCode == 429 || responseException.getStatusCode().is5xxServerError();
+        }
+
+        // 네트워크/타임아웃 계열은 일시 실패 가능성이 높아 재시도 대상
+        return root instanceof WebClientRequestException
+                || root instanceof TimeoutException
+                || root instanceof SocketTimeoutException
+                || root instanceof ConnectException
+                || root instanceof IOException;
     }
 
     private <T> T parseResponse(String jsonResponse, Class<T> clazz) {
@@ -177,13 +213,17 @@ public abstract class AbstractGenerationService implements AiProviderService {
             return "(no error)";
         }
 
-        Throwable root = throwable;
-        while (root.getCause() != null) {
-            root = root.getCause();
-        }
-
+        Throwable root = rootCause(throwable);
         String message = root.getMessage();
         return root.getClass().getSimpleName() + ": " + (message == null ? "(no message)" : message);
+    }
+
+    private Throwable rootCause(Throwable throwable) {
+        Throwable root = throwable;
+        while (root != null && root.getCause() != null) {
+            root = root.getCause();
+        }
+        return root == null ? throwable : root;
     }
 
     protected abstract String getApiUrl();

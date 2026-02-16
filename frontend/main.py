@@ -4,7 +4,7 @@ from urllib.parse import quote_plus
 from PyQt5.QtWidgets import QApplication, QMessageBox
 
 from api_worker import ApiWorker
-from config import BASE_URL
+from config import BASE_URL, KAKAO_REDIRECT_URI
 from login_window import LoginWindow
 from main_window import MainWindow
 
@@ -22,12 +22,11 @@ class MainController:
         self.login_win.show()
 
     def process_login(self, auth_code, state):
-        redirect_uri = "http://localhost:8989"
         url = (
             f"{BASE_URL}/api/v1/auth/callback/kakao"
             f"?code={quote_plus(auth_code)}"
             f"&state={quote_plus(state)}"
-            f"&redirectUri={quote_plus(redirect_uri)}"
+            f"&redirectUri={quote_plus(KAKAO_REDIRECT_URI)}"
         )
 
         self.api_worker = ApiWorker("GET", url)
@@ -47,7 +46,6 @@ class MainController:
             QMessageBox.critical(self.login_win, "로그인 실패", "Access Token을 받지 못했습니다.")
             return
 
-        print(f"Access Token 수신 성공: {self.access_token}")
         self.show_main_window(self.access_token)
 
     def show_main_window(self, access_token):

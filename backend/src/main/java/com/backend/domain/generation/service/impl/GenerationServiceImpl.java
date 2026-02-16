@@ -82,6 +82,12 @@ public class GenerationServiceImpl implements GenerationService {
                         log.warn("단계 실패 - 인증정보 생성(AI): memberId={}, model={}, elapsedMs={}, error={}",
                                 memberId, model, elapsedMs, rootMessage(throwable));
                     }
+                })
+                // 인증조회 실패는 전체 생성 중단 대신 기본값으로 폴백하여 결과를 반환
+                .exceptionally(throwable -> {
+                    log.warn("인증정보 조회 실패 폴백 적용: memberId={}, model={}, error={}",
+                            memberId, model, rootMessage(throwable));
+                    return new CertificationResponse();
                 });
 
         final long mainSpecStartNanos = System.nanoTime();
