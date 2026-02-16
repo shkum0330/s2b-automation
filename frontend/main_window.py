@@ -45,8 +45,10 @@ class MainWindow(QWidget):
         super().__init__()
         self.access_token = access_token
         self.worker = None
+        self.polling_worker = None
         self.auto_input_worker = None
         self.current_task_id = None
+        self.is_polling_inflight = False
         self.polling_timer = QTimer(self)
         self.polling_timer.timeout.connect(self.check_task_status)
 
@@ -278,6 +280,7 @@ class MainWindow(QWidget):
         self.worker.start()
 
     def handle_api_result(self, result):
+        self._stop_polling()
         self.status_label.setText("상태: ✅ AI 생성 완료!")
         for key, widgets in self.output_widgets.items():
             if widgets['field'].isVisible():
@@ -327,33 +330,48 @@ class MainWindow(QWidget):
 
         if "taskId" in json_body:
             self.current_task_id = json_body["taskId"]
+            self.is_polling_inflight = False
             self.status_label.setText("상태: ⏳ 작업 진행 중... (결과 대기)")
             self.polling_timer.start(3000)
         else:
             # 호환성을 위해 남겨둠
             self.handle_api_result(json_body.get("result", json_body))
 
+    def _stop_polling(self):
+        """작업 상태 조회 타이머와 중복 요청 상태를 함께 초기화한다."""
+        self.polling_timer.stop()
+        self.is_polling_inflight = False
+        self.polling_worker = None
+
     def check_task_status(self):
-        if not self.current_task_id:
+        if not self.current_task_id or self.is_polling_inflight:
             return
+
+        self.is_polling_inflight = True
         url = f"{BASE_URL}/api/v1/generation/result/{self.current_task_id}"
         headers = {"Authorization": self.access_token}
-        self.worker = ApiWorker('GET', url, headers=headers, timeout=5)
-        self.worker.finished.connect(self.handle_polling_response)
-        self.worker.start()
+        self.polling_worker = ApiWorker('GET', url, headers=headers, timeout=5)
+        self.polling_worker.finished.connect(self.handle_polling_response)
+        self.polling_worker.start()
 
     def handle_polling_response(self, result):
+        self.is_polling_inflight = False
+        self.polling_worker = None
+
+        if not self.current_task_id:
+            return
+
         if not result.get('ok'):
-            self.polling_timer.stop()
+            self._stop_polling()
             self.handle_error(result.get('json', {}).get('message', result.get('error', '알 수 없는 오류')))
             return
         json_body = result.get('json', {})
         status = json_body.get("status")
         if status == "COMPLETED":
-            self.polling_timer.stop()
+            self._stop_polling()
             self.handle_api_result(json_body.get("result"))
         elif status in ["FAILED", "CANCELLED", "NOT_FOUND"]:
-            self.polling_timer.stop()
+            self._stop_polling()
             self.handle_error(f"작업 실패 또는 취소됨 (상태: {status})")
         else:
             self.status_label.setText("상태: ⏳ 작업 진행 중...")
@@ -361,7 +379,7 @@ class MainWindow(QWidget):
     def cancel_api_call(self):
         if not self.current_task_id:
             return
-        self.polling_timer.stop()
+        self._stop_polling()
         self.status_label.setText("상태: ❌ 작업 취소 요청 중...")
         url = f"{BASE_URL}/api/v1/generation/cancel/{self.current_task_id}"
         headers = {"Authorization": self.access_token}
@@ -379,6 +397,7 @@ class MainWindow(QWidget):
         self.current_task_id = None
 
     def handle_error(self, error_message):
+        self._stop_polling()
         self.status_label.setText(f"상태: ❌ 오류 발생")
         QMessageBox.critical(self, "오류", str(error_message))
         self.run_button.setEnabled(True)
