@@ -50,7 +50,7 @@ out/
 # NPM dependency folders (if frontend uses npm)
 /frontend/node_modules/
 
-env.yml
-
+# Sensitive local configuration
+backend/src/main/resources/env.yml
 frontend/config.ini
 frontend/config.py
