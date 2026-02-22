@@ -4,6 +4,7 @@ import com.backend.domain.member.entity.Member;
 import com.backend.domain.payment.dto.PaymentConfirmRequestDto;
 import com.backend.domain.payment.dto.PaymentRequestDto;
 import com.backend.domain.payment.entity.Payment;
+import com.backend.domain.payment.service.BillingKeyService;
 import com.backend.domain.payment.service.PaymentService;
 import com.backend.global.auth.entity.MemberDetails;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -37,7 +38,6 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @Controller
@@ -46,12 +46,11 @@ import java.util.concurrent.ConcurrentHashMap;
 public class PaymentController {
 
     private final PaymentService paymentService;
+    private final BillingKeyService billingKeyService;
     private final ObjectMapper objectMapper;
 
     @Value("${toss.secret-key}")
     private String apiSecretKey;
-
-    private final Map<String, String> billingKeyMap = new ConcurrentHashMap<>();
 
     @PostMapping("/request")
     @ResponseBody
@@ -138,7 +137,7 @@ public class PaymentController {
             return ResponseEntity.badRequest().body(errorResponse("INVALID_CUSTOMER_KEY", "customerKey가 유효하지 않습니다."));
         }
 
-        String billingKey = billingKeyMap.get(customerKeyNode.asText());
+        String billingKey = billingKeyService.findBillingKey(customerKeyNode.asText()).orElse(null);
         if (billingKey == null || billingKey.isBlank()) {
             return ResponseEntity.badRequest().body(errorResponse("INVALID_BILLING_KEY", "유효한 billingKey가 없습니다."));
         }
@@ -164,7 +163,7 @@ public class PaymentController {
             JsonNode customerKeyNode = requestData.get("customerKey");
             JsonNode billingKeyNode = response.get("billingKey");
             if (customerKeyNode != null && !customerKeyNode.asText().isBlank() && billingKeyNode != null) {
-                billingKeyMap.put(customerKeyNode.asText(), billingKeyNode.asText());
+                billingKeyService.saveBillingKey(customerKeyNode.asText(), billingKeyNode.asText());
             }
         }
 

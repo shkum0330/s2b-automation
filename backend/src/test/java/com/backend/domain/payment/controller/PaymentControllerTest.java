@@ -4,6 +4,7 @@ import com.backend.domain.member.entity.Member;
 import com.backend.domain.member.entity.Role;
 import com.backend.domain.payment.dto.TossConfirmResponseDto;
 import com.backend.domain.payment.entity.Payment;
+import com.backend.domain.payment.service.BillingKeyService;
 import com.backend.domain.payment.service.PaymentService;
 import com.backend.global.auth.entity.MemberDetails;
 import org.junit.jupiter.api.DisplayName;
@@ -37,6 +38,9 @@ class PaymentControllerTest {
 
     @MockitoBean
     private PaymentService paymentService;
+
+    @MockitoBean
+    private BillingKeyService billingKeyService;
 
     @MockitoBean
     private JpaMetamodelMappingContext jpaMetamodelMappingContext;
