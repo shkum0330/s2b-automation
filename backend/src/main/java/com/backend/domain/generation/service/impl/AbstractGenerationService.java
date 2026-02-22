@@ -72,7 +72,8 @@ public abstract class AbstractGenerationService implements AiProviderService {
                 .bodyValue(requestEntity.getBody())
                 .retrieve()
                 .bodyToMono(String.class)
-                .timeout(requestTimeout);
+                .timeout(requestTimeout)
+                .switchIfEmpty(Mono.error(new GenerateApiException("AI 서버로부터 빈 응답을 수신했습니다.")));
 
         // 4xx 전체 재시도는 오히려 지연만 늘릴 수 있어, 재시도 가치가 있는 오류만 선별
         if (retryMaxAttempts > 0) {
