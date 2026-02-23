@@ -18,7 +18,7 @@ class ScrapingServiceTest {
     private ScrapingService scrapingService;
 
     @Test
-    @DisplayName("G2B 번호 테스트 성공: 실제 스크래핑으로 물품목록번호를 가져온다")
+    @DisplayName("나라장터 물품분류번호 조회가 정상적으로 동작한다")
     void findG2bClassificationNumber_success() {
         // given
         String modelName = "AX033B310GBD";
@@ -33,7 +33,7 @@ class ScrapingServiceTest {
     }
 
     @Test
-    @DisplayName("G2B 번호 테스트 실패: 존재하지 않는 모델명 검색 시 Optional.empty()를 반환한다")
+    @DisplayName("존재하지 않는 모델명은 나라장터 물품분류번호를 비어 있는 값으로 반환한다")
     void findG2bClassificationNumber_whenNotFound() {
         // given
         String modelName = "THIS_MODEL_NAME_DOES_NOT_EXIST_XYZ123";
@@ -46,7 +46,7 @@ class ScrapingServiceTest {
     }
 
     @Test
-    @DisplayName("원산지 테스트 성공: 실제 스크래핑으로 국가코드(를 가져온다")
+    @DisplayName("원산지 조회가 정상적으로 동작한다")
     void findCountryOfOrigin_success() {
         // given
         String modelName = "AX033B310GBD";
@@ -62,7 +62,7 @@ class ScrapingServiceTest {
     }
 
     @Test
-    @DisplayName("원산지 테스트 실패: 존재하지 않는 모델명 검색 시 Optional.empty()를 반환한다")
+    @DisplayName("존재하지 않는 모델명은 원산지를 비어 있는 값으로 반환한다")
     void findCountryOfOrigin_whenNotFound() {
         // given
         String modelName = "THIS_MODEL_NAME_DOES_NOT_EXIST_XYZ123";
@@ -73,3 +73,6 @@ class ScrapingServiceTest {
         assertFalse(actualCountryCodeOpt.isPresent(), "존재하지 않는 모델명 검색 시 국가코드 결과가 비어있어야 합니다.");
     }
 }
+
+
+

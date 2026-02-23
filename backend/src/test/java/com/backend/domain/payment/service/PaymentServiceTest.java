@@ -82,7 +82,7 @@ class PaymentServiceTest {
     }
 
     @Test
-    @DisplayName("결제 요청 성공: 유효한 금액과 주문명으로 요청 시 READY 상태의 Payment가 저장된다")
+    @DisplayName("유효한 결제 요청은 준비 상태로 저장된다")
     void requestPayment_success() {
         // given
         Long validAmount = 29900L;
@@ -105,7 +105,7 @@ class PaymentServiceTest {
     }
 
     @Test
-    @DisplayName("결제 요청 실패: 유효하지 않은 금액으로 요청 시 예외 발생")
+    @DisplayName("유효하지 않은 결제 금액은 예외가 발생한다")
     void requestPayment_fail_invalidAmount() {
         // given
         Long invalidAmount = 500L; // 정의되지 않은 금액
@@ -122,7 +122,7 @@ class PaymentServiceTest {
     // --- 2. confirmPayment 테스트 ---
 
     @Test
-    @DisplayName("결제 승인 성공: Toss API 승인 후 DB 업데이트 및 멤버십 등급 상향")
+    @DisplayName("결제 승인 성공 시 결제 상태와 멤버십이 갱신된다")
     void confirmPayment_success() throws JsonProcessingException {
         // given
         // 1. READY 상태의 결제 데이터 생성
@@ -165,7 +165,7 @@ class PaymentServiceTest {
     }
 
     @Test
-    @DisplayName("결제 승인 실패: 요청 금액 불일치 시 ABORTED 상태로 변경되고 예외 발생")
+    @DisplayName("요청 금액이 다르면 결제는 중단 상태가 되고 예외가 발생한다")
     void confirmPayment_fail_amountMismatch() {
         // given
         Long originalAmount = 29900L;
@@ -190,7 +190,7 @@ class PaymentServiceTest {
     }
 
     @Test
-    @DisplayName("결제 승인 실패: 존재하지 않는 주문 ID 요청 시 예외 발생")
+    @DisplayName("존재하지 않는 주문 식별자로 승인 요청하면 예외가 발생한다")
     void confirmPayment_fail_notFound() {
         // given
         String nonExistentOrderId = "unknown_order_id";
@@ -204,3 +204,8 @@ class PaymentServiceTest {
         });
     }
 }
+
+
+
+
+

@@ -90,7 +90,7 @@ class LogServiceTest {
     }
 
     @Test
-    @DisplayName("로그 검색 - 이메일로 필터링")
+    @DisplayName("이메일 조건으로 로그를 조회할 수 있다")
     void searchLogs_filterByEmail() {
         LogSearchRequest request = new LogSearchRequest();
         request.setMemberEmail(memberA.getEmail());
@@ -103,7 +103,7 @@ class LogServiceTest {
     }
 
     @Test
-    @DisplayName("로그 검색 - 성공 여부로 필터링")
+    @DisplayName("성공 여부 조건으로 로그를 조회할 수 있다")
     void searchLogs_filterBySuccess() {
         LogSearchRequest request = new LogSearchRequest();
         request.setMemberEmail(testEmailPrefix);
@@ -117,7 +117,7 @@ class LogServiceTest {
     }
 
     @Test
-    @DisplayName("로그 검색 - 복합 조건(이메일 + 실패) 필터링")
+    @DisplayName("이메일과 성공 여부를 함께 조건으로 로그를 조회할 수 있다")
     void searchLogs_filterByEmailAndSuccess() {
         LogSearchRequest request = new LogSearchRequest();
         request.setMemberEmail(memberA.getEmail());
@@ -132,7 +132,7 @@ class LogServiceTest {
     }
 
     @Test
-    @DisplayName("로그 상세 조회 - 성공")
+    @DisplayName("로그 상세를 정상적으로 조회할 수 있다")
     void getLogDetail_success() {
         GenerationLog savedLog = logRepository.save(GenerationLog.builder()
                 .member(memberA)
@@ -150,7 +150,7 @@ class LogServiceTest {
     }
 
     @Test
-    @DisplayName("로그 상세 조회 - 존재하지 않는 ID 예외 발생")
+    @DisplayName("존재하지 않는 로그 식별자 조회 시 예외가 발생한다")
     void getLogDetail_notFound() {
         Long nonExistentId = 99999L;
 
@@ -159,3 +159,7 @@ class LogServiceTest {
         });
     }
 }
+
+
+
+

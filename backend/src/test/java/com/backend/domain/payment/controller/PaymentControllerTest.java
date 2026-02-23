@@ -63,7 +63,7 @@ class PaymentControllerTest {
     }
 
     @Test
-    @DisplayName("결제 요청(POST /request) 테스트 - 성공")
+    @DisplayName("결제 요청 인터페이스는 정상 응답을 반환한다")
     void requestPayment_success() throws Exception {
         Member member = createTestMember();
         setMockUser(member);
@@ -88,7 +88,7 @@ class PaymentControllerTest {
     }
 
     @Test
-    @DisplayName("결제 성공 리다이렉트(GET /success) 테스트 - 성공 시 뷰 반환")
+    @DisplayName("결제 성공 이동 요청은 성공 화면을 반환한다")
     void paymentSuccess_success() throws Exception {
         String paymentKey = "test_key";
         String orderId = "order_123";
@@ -107,3 +107,5 @@ class PaymentControllerTest {
                 .andDo(print());
     }
 }
+
+
