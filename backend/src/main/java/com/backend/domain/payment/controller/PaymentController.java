@@ -45,6 +45,9 @@ import java.util.Map;
 @RequestMapping("/api/v1/payments")
 public class PaymentController {
 
+    private static final int HTTP_CONNECT_TIMEOUT_MS = 5000;
+    private static final int HTTP_READ_TIMEOUT_MS = 30000;
+
     private final PaymentService paymentService;
     private final BillingKeyService billingKeyService;
     private final ObjectMapper objectMapper;
@@ -246,6 +249,8 @@ public class PaymentController {
         connection.setRequestProperty("Content-Type", "application/json");
         connection.setRequestMethod("POST");
         connection.setDoOutput(true);
+        connection.setConnectTimeout(HTTP_CONNECT_TIMEOUT_MS);
+        connection.setReadTimeout(HTTP_READ_TIMEOUT_MS);
         return connection;
     }
 
