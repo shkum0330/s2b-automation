@@ -11,7 +11,7 @@ from main_window import MainWindow
 
 class MainController:
     def __init__(self):
-        self.login_win = LoginWindow()6
+        self.login_win = LoginWindow()
         self.main_win = None
         self.api_worker = None
         self.access_token = None
