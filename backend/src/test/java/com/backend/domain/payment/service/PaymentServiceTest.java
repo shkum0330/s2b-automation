@@ -3,6 +3,7 @@ package com.backend.domain.payment.service;
 import com.backend.domain.member.entity.Member;
 import com.backend.domain.member.entity.Role;
 import com.backend.domain.member.repository.MemberRepository;
+import com.backend.domain.payment.dto.TossConfirmResponseDto;
 import com.backend.domain.payment.entity.Payment;
 import com.backend.domain.payment.repository.PaymentRepository;
 import com.backend.global.exception.NotFoundException;
@@ -19,7 +20,6 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.transaction.annotation.Transactional;
-import reactor.test.StepVerifier;
 
 import java.io.IOException;
 import java.time.LocalDate;
@@ -146,13 +146,12 @@ class PaymentServiceTest {
                 .setBody(mockResponseBody));
 
         // when
-        StepVerifier.create(paymentService.confirmPayment(paymentKey, orderId, amount))
-                .expectNextMatches(responseDto ->
-                        responseDto.getStatus().equals("DONE") &&
-                                responseDto.getOrderId().equals(orderId))
-                .verifyComplete();
+        TossConfirmResponseDto responseDto = paymentService.confirmPayment(paymentKey, orderId, amount);
 
         // then
+        assertThat(responseDto.getStatus()).isEqualTo("DONE");
+        assertThat(responseDto.getOrderId()).isEqualTo(orderId);
+
         // 1. Payment 상태가 DONE으로 변경되었는지 확인
         Payment confirmedPayment = paymentRepository.findByOrderId(orderId).orElseThrow();
         assertThat(confirmedPayment.getStatus()).isEqualTo("DONE");
@@ -176,12 +175,11 @@ class PaymentServiceTest {
         String orderId = readyPayment.getOrderId();
         String paymentKey = "test_payment_key_fail";
 
-        // when & then (StepVerifier로 Mono 에러 검증)
-        StepVerifier.create(paymentService.confirmPayment(paymentKey, orderId, wrongAmount))
-                .expectErrorMatches(throwable ->
-                        throwable instanceof IllegalArgumentException &&
-                                throwable.getMessage().equals("주문 금액이 일치하지 않습니다."))
-                .verify();
+        // when & then
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
+            paymentService.confirmPayment(paymentKey, orderId, wrongAmount);
+        });
+        assertThat(exception.getMessage()).isEqualTo("주문 금액이 일치하지 않습니다.");
 
         // then
         // 금액 불일치 시 failPayment()가 호출되어 status가 ABORTED로 변경되었는지 확인

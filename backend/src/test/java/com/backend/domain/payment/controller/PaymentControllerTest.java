@@ -19,7 +19,6 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
-import reactor.core.publisher.Mono;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -96,7 +95,7 @@ class PaymentControllerTest {
 
         TossConfirmResponseDto mockResponse = new TossConfirmResponseDto();
         given(paymentService.confirmPayment(paymentKey, orderId, amount))
-                .willReturn(Mono.just(mockResponse));
+                .willReturn(mockResponse);
 
         mockMvc.perform(get("/api/v1/payments/success")
                         .param("paymentKey", paymentKey)

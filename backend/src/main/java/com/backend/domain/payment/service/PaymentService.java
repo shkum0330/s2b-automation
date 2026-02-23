@@ -16,7 +16,6 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
-import reactor.core.publisher.Mono;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
@@ -72,17 +71,17 @@ public class PaymentService {
         return paymentRepository.save(payment);
     }
 
-    public Mono<TossConfirmResponseDto> confirmPayment(String paymentKey, String orderId, Long amount) {
+    public TossConfirmResponseDto confirmPayment(String paymentKey, String orderId, Long amount) {
         Payment payment = paymentRepository.findByOrderId(orderId)
                 .orElseThrow(() -> new NotFoundException("주문 정보를 찾을 수 없습니다. orderId=" + orderId));
 
         if (!"READY".equals(payment.getStatus())) {
-            return Mono.error(new IllegalArgumentException("처리 가능한 결제 상태가 아닙니다."));
+            throw new IllegalArgumentException("처리 가능한 결제 상태가 아닙니다.");
         }
 
         if (!Objects.equals(payment.getAmount(), amount)) {
             markPaymentAsFailed(payment);
-            return Mono.error(new IllegalArgumentException("주문 금액이 일치하지 않습니다."));
+            throw new IllegalArgumentException("주문 금액이 일치하지 않습니다.");
         }
 
         Map<String, Object> body = Map.of(
@@ -102,11 +101,14 @@ public class PaymentService {
             return validateAndApplyPayment(payment, orderId, amount, response);
         } catch (Exception e) {
             log.error("결제 확인 실패: {}", e.getMessage());
-            return Mono.error(e);
+            if (e instanceof RuntimeException runtimeException) {
+                throw runtimeException;
+            }
+            throw new IllegalStateException("결제 확인 처리 중 오류가 발생했습니다.", e);
         }
     }
 
-    private Mono<TossConfirmResponseDto> validateAndApplyPayment(
+    private TossConfirmResponseDto validateAndApplyPayment(
             Payment payment,
             String orderId,
             Long amount,
@@ -114,22 +116,22 @@ public class PaymentService {
     ) {
         if (response == null) {
             markPaymentAsFailed(payment);
-            return Mono.error(new IllegalArgumentException("결제 확인 응답이 비어 있습니다."));
+            throw new IllegalArgumentException("결제 확인 응답이 비어 있습니다.");
         }
 
         if (!Objects.equals(response.getOrderId(), orderId)
                 || !Objects.equals(response.getTotalAmount(), amount)) {
             markPaymentAsFailed(payment);
-            return Mono.error(new IllegalArgumentException("결제 검증에 실패했습니다."));
+            throw new IllegalArgumentException("결제 검증에 실패했습니다.");
         }
 
         if (!"DONE".equals(response.getStatus())) {
             markPaymentAsFailed(payment);
-            return Mono.error(new IllegalArgumentException("결제가 완료 상태가 아닙니다."));
+            throw new IllegalArgumentException("결제가 완료 상태가 아닙니다.");
         }
 
         handleSuccessfulPayment(payment, response);
-        return Mono.just(response);
+        return response;
     }
 
     private void handleSuccessfulPayment(Payment payment, TossConfirmResponseDto response) {

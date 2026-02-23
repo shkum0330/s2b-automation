@@ -92,7 +92,7 @@ public class PaymentController {
     ) {
         log.info("결제 확인 요청 (Redirect) - orderId: {}, amount: {}", orderId, amount);
 
-        return paymentService.confirmPayment(paymentKey, orderId, amount)
+        return Mono.fromCallable(() -> paymentService.confirmPayment(paymentKey, orderId, amount))
                 .map(response -> {
                     model.addAttribute("orderId", response.getOrderId());
                     model.addAttribute("amount", response.getTotalAmount());
@@ -110,11 +110,11 @@ public class PaymentController {
     @PostMapping(value = {"/confirm/widget", "/confirm/payment"})
     @ResponseBody
     public Mono<ResponseEntity<Object>> confirmPayment(@Valid @RequestBody PaymentConfirmRequestDto requestDto) {
-        return paymentService.confirmPayment(
+        return Mono.fromCallable(() -> paymentService.confirmPayment(
                         requestDto.getPaymentKey(),
                         requestDto.getOrderId(),
                         requestDto.getAmount()
-                )
+                ))
                 .map(response -> ResponseEntity.ok((Object) response))
                 .onErrorResume(e -> {
                     String message = (e.getMessage() == null || e.getMessage().isBlank())
