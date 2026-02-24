@@ -101,10 +101,14 @@ public class AuthController {
     }
 
     private boolean isAllowedRedirectUri(String target) {
+        if (!StringUtils.hasText(target)) {
+            return false;
+        }
+
         Set<String> allowList = new HashSet<>();
-        allowList.add(defaultRedirectUri);
-        allowList.add("http://localhost:8989");
-        allowList.add("http://localhost:8080/admin/login");
+        if (StringUtils.hasText(defaultRedirectUri)) {
+            allowList.add(defaultRedirectUri);
+        }
 
         if (StringUtils.hasText(allowedRedirectUrisRaw)) {
             Arrays.stream(allowedRedirectUrisRaw.split(","))
