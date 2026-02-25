@@ -39,8 +39,13 @@ class MainController:
             QMessageBox.critical(self.login_win, "로그인 실패", error_msg)
             return
 
-        headers = response.get("headers", {})
-        self.access_token = headers.get("Authorization")
+        headers = response.get("headers") or {}
+        self.access_token = headers.get("Authorization") or headers.get("authorization")
+        if not self.access_token:
+            for header_key, header_value in headers.items():
+                if isinstance(header_key, str) and header_key.lower() == "authorization":
+                    self.access_token = header_value
+                    break
 
         if not self.access_token:
             QMessageBox.critical(self.login_win, "로그인 실패", "Access Token을 받지 못했습니다.")
