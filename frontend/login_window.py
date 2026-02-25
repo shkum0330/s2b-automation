@@ -1,7 +1,7 @@
 import threading
 import webbrowser
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, urlencode, urlparse
 
 from PyQt5.QtCore import QTimer, pyqtSignal
 from PyQt5.QtWidgets import QDesktopWidget, QMessageBox, QPushButton, QVBoxLayout, QWidget
@@ -86,12 +86,13 @@ class LoginWindow(QWidget):
         if not self._start_callback_server():
             return
 
-        auth_url = (
-            "https://kauth.kakao.com/oauth/authorize"
-            f"?response_type=code&client_id={KAKAO_CLIENT_ID}"
-            f"&redirect_uri={KAKAO_REDIRECT_URI}"
-            f"&state={state}"
-        )
+        auth_query = urlencode({
+            "response_type": "code",
+            "client_id": KAKAO_CLIENT_ID,
+            "redirect_uri": KAKAO_REDIRECT_URI,
+            "state": state,
+        })
+        auth_url = f"https://kauth.kakao.com/oauth/authorize?{auth_query}"
         webbrowser.open(auth_url)
 
         self.check_timer.start(1000)

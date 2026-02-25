@@ -88,7 +88,8 @@ public class SecurityConfig {
                         ).permitAll()
 
                         .requestMatchers(HttpMethod.POST,
-                                "/api/v1/payments/confirm/widget"
+                                "/api/v1/payments/confirm/widget",
+                                "/api/v1/payments/confirm/payment"
                         ).permitAll()
 
                         .requestMatchers("/admin/**").hasAuthority("ADMIN")
