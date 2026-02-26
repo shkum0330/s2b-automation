@@ -1,14 +1,12 @@
-import sys
 import pyperclip
 from PyQt5.QtWidgets import (QWidget, QLabel, QLineEdit, QTextEdit,
                              QPushButton, QVBoxLayout, QGroupBox, QGridLayout,
-                             QMessageBox, QHBoxLayout, QRadioButton, QFrame, QApplication)
-from PyQt5.QtCore import Qt, QTimer
+                             QMessageBox, QHBoxLayout, QRadioButton, QFrame)
+from PyQt5.QtCore import Qt, QThread, QTimer, pyqtSignal
 from PyQt5.QtGui import QFont
 from api_worker import ApiWorker
 from config import BASE_URL
 from auto_input_manager import AutoInputManager
-
 
 # 붙여넣기 시 줄바꿈을 공백으로 치환하고 서식을 제거하는 커스텀 QTextEdit
 class PlainTextPasteEdit(QTextEdit):
@@ -22,12 +20,35 @@ class PlainTextPasteEdit(QTextEdit):
             super().insertFromMimeData(source)
 
 
+class AutoInputWorker(QThread):
+    """자동 입력 로직을 UI 스레드와 분리해 화면 멈춤을 방지한다."""
+    status_changed = pyqtSignal(str)
+    error_occurred = pyqtSignal(str)
+
+    def __init__(self, input_manager, input_data):
+        super().__init__()
+        self.input_manager = input_manager
+        self.input_data = input_data
+
+    def run(self):
+        try:
+            self.input_manager.start_input(
+                self.input_data,
+                status_callback=self.status_changed.emit,
+            )
+        except Exception as exc:
+            self.error_occurred.emit(str(exc))
+
+
 class MainWindow(QWidget):
     def __init__(self, access_token=None):
         super().__init__()
         self.access_token = access_token
         self.worker = None
+        self.polling_worker = None
+        self.auto_input_worker = None
         self.current_task_id = None
+        self.is_polling_inflight = False
         self.polling_timer = QTimer(self)
         self.polling_timer.timeout.connect(self.check_task_status)
 
@@ -36,7 +57,7 @@ class MainWindow(QWidget):
         self.input_widgets = {}
         self.output_widgets = {}
 
-        # [수정] 창을 항상 최상위에 고정 (다른 창을 눌러도 뒤로 가지 않음)
+        # 창을 항상 최상위에 고정
         self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint)
 
         self.initUI()
@@ -70,8 +91,8 @@ class MainWindow(QWidget):
 
         # 수직 구분선
         separator = QFrame()
-        separator.setFrameShape(QFrame.VLine)  # 수직선 모양
-        separator.setFrameShadow(QFrame.Sunken)  # 약간의 음영 효과
+        separator.setFrameShape(QFrame.VLine)
+        separator.setFrameShadow(QFrame.Sunken)
 
         top_layout = QHBoxLayout()
         top_layout.addLayout(product_type_layout)
@@ -89,7 +110,7 @@ class MainWindow(QWidget):
         self.input_widgets['product_name_input'] = QLineEdit()
         self.input_widgets['spec_example_label'] = QLabel("2. 규격 예시:")
 
-        # 커스텀 위젯 적용 (붙여넣기 시 줄바꿈 제거)
+        # 커스텀 위젯 적용
         self.input_widgets['spec_example_input'] = PlainTextPasteEdit()
         self.input_widgets['spec_example_input'].setFixedHeight(80)
 
@@ -143,7 +164,7 @@ class MainWindow(QWidget):
             self.output_widgets[key] = {'label': label, 'field': output_field, 'button': copy_button}
 
         row = 0
-        for key in [k for k, _ in output_widget_info]:  # 순서 보장을 위해 리스트 컴프리헨션 사용
+        for key in [k for k, _ in output_widget_info]:
             widgets = self.output_widgets[key]
             align = Qt.AlignTop if isinstance(widgets['field'], QTextEdit) else Qt.AlignLeft
             res_layout.addWidget(widgets['label'], row, 0, align)
@@ -177,13 +198,11 @@ class MainWindow(QWidget):
 
         self.auto_input_button = QPushButton("자동 입력")
         self.auto_input_button.setFont(default_font)
-        # self.auto_input_button.setFixedWidth(200) # 필요시 크기 고정
 
         auto_input_layout = QHBoxLayout()
         auto_input_layout.addWidget(self.auto_input_button)
         auto_input_group.setLayout(auto_input_layout)
 
-        # 전체 레이아웃 구성
         main_layout = QVBoxLayout(self)
         main_layout.addLayout(top_layout)
         main_layout.addWidget(request_group)
@@ -191,15 +210,12 @@ class MainWindow(QWidget):
         main_layout.addWidget(response_group)
         main_layout.addWidget(auto_input_group)
 
-        # 이벤트 연결
         self.run_button.clicked.connect(self.start_api_call)
         self.cancel_button.clicked.connect(self.cancel_api_call)
-
-        # 자동 입력 이벤트 연결
         self.auto_input_button.clicked.connect(self.request_auto_input)
 
         self.setWindowTitle("S2B 상품 정보 AI 생성기")
-        self.setGeometry(300, 300, 840, 950)  # 세로 길이 조금 더 늘림
+        self.setGeometry(300, 300, 840, 950)
 
     def _update_ui_for_product_type(self):
         is_electronic = self.radio_electronic.isChecked()
@@ -211,7 +227,6 @@ class MainWindow(QWidget):
         self.input_widgets['product_name_label'].setVisible(not is_electronic)
         self.input_widgets['product_name_input'].setVisible(not is_electronic)
 
-        # 전자제품일 때만 보이는 항목들
         self.output_widgets['modelName']['label'].setVisible(is_electronic)
         self.output_widgets['modelName']['field'].setVisible(is_electronic)
         self.output_widgets['modelName']['button'].setVisible(is_electronic)
@@ -225,13 +240,11 @@ class MainWindow(QWidget):
         self.output_widgets['g2bClassificationNumber']['field'].setVisible(is_electronic)
         self.output_widgets['g2bClassificationNumber']['button'].setVisible(is_electronic)
 
-        # 제품 유형에 따른 라벨 번호 및 가시성 동적 변경
         if is_electronic:
             self.output_widgets['price']['label'].setText("4. 제시금액:")
             self.output_widgets['manufacturer']['label'].setText("5. 제조사:")
             self.output_widgets['countryOfOrigin']['label'].setText("6. 원산지:")
         else:
-            # 비전자제품일 경우 모델명이 빠지므로 번호를 당김
             self.output_widgets['price']['label'].setText("3. 제시금액:")
             self.output_widgets['manufacturer']['label'].setText("4. 제조사:")
             self.output_widgets['countryOfOrigin']['label'].setText("5. 원산지:")
@@ -267,6 +280,7 @@ class MainWindow(QWidget):
         self.worker.start()
 
     def handle_api_result(self, result):
+        self._stop_polling()
         self.status_label.setText("상태: ✅ AI 생성 완료!")
         for key, widgets in self.output_widgets.items():
             if widgets['field'].isVisible():
@@ -307,40 +321,57 @@ class MainWindow(QWidget):
                 for field, msg in json_response['errors'].items():
                     detailed_errors.append(f"- {field}: {msg}")
                 error_message += "\n\n[상세 내용]\n" + "\n".join(detailed_errors)
-            self.handle_error(result.get('json', {}).get('message', result.get('error', '알 수 없는 오류')))
+            self.handle_error(error_message)
 
             return
 
         json_body = result.get('json', {})
-        is_electronic = self.radio_electronic.isChecked()
-        if is_electronic and "taskId" in json_body:
+
+
+        if "taskId" in json_body:
             self.current_task_id = json_body["taskId"]
-            self.status_label.setText("상태: ⏳ 폴링 시작...")
+            self.is_polling_inflight = False
+            self.status_label.setText("상태: ⏳ 작업 진행 중... (결과 대기)")
             self.polling_timer.start(3000)
         else:
+            # 호환성을 위해 남겨둠
             self.handle_api_result(json_body.get("result", json_body))
 
+    def _stop_polling(self):
+        """작업 상태 조회 타이머와 중복 요청 상태를 함께 초기화한다."""
+        self.polling_timer.stop()
+        self.is_polling_inflight = False
+        self.polling_worker = None
+
     def check_task_status(self):
-        if not self.current_task_id:
+        if not self.current_task_id or self.is_polling_inflight:
             return
+
+        self.is_polling_inflight = True
         url = f"{BASE_URL}/api/v1/generation/result/{self.current_task_id}"
         headers = {"Authorization": self.access_token}
-        self.worker = ApiWorker('GET', url, headers=headers, timeout=5)
-        self.worker.finished.connect(self.handle_polling_response)
-        self.worker.start()
+        self.polling_worker = ApiWorker('GET', url, headers=headers, timeout=5)
+        self.polling_worker.finished.connect(self.handle_polling_response)
+        self.polling_worker.start()
 
     def handle_polling_response(self, result):
+        self.is_polling_inflight = False
+        self.polling_worker = None
+
+        if not self.current_task_id:
+            return
+
         if not result.get('ok'):
-            self.polling_timer.stop()
+            self._stop_polling()
             self.handle_error(result.get('json', {}).get('message', result.get('error', '알 수 없는 오류')))
             return
         json_body = result.get('json', {})
         status = json_body.get("status")
         if status == "COMPLETED":
-            self.polling_timer.stop()
+            self._stop_polling()
             self.handle_api_result(json_body.get("result"))
         elif status in ["FAILED", "CANCELLED", "NOT_FOUND"]:
-            self.polling_timer.stop()
+            self._stop_polling()
             self.handle_error(f"작업 실패 또는 취소됨 (상태: {status})")
         else:
             self.status_label.setText("상태: ⏳ 작업 진행 중...")
@@ -348,7 +379,7 @@ class MainWindow(QWidget):
     def cancel_api_call(self):
         if not self.current_task_id:
             return
-        self.polling_timer.stop()
+        self._stop_polling()
         self.status_label.setText("상태: ❌ 작업 취소 요청 중...")
         url = f"{BASE_URL}/api/v1/generation/cancel/{self.current_task_id}"
         headers = {"Authorization": self.access_token}
@@ -366,6 +397,7 @@ class MainWindow(QWidget):
         self.current_task_id = None
 
     def handle_error(self, error_message):
+        self._stop_polling()
         self.status_label.setText(f"상태: ❌ 오류 발생")
         QMessageBox.critical(self, "오류", str(error_message))
         self.run_button.setEnabled(True)
@@ -385,7 +417,6 @@ class MainWindow(QWidget):
 
     def request_auto_input(self):
         """자동 입력 시작 요청"""
-        # 사용자 안내 (이미지 인식 주의사항)
         msg = QMessageBox()
         msg.setIcon(QMessageBox.Information)
         msg.setWindowTitle("이미지 인식 자동 입력")
@@ -395,24 +426,36 @@ class MainWindow(QWidget):
         if msg.exec_() != QMessageBox.Ok:
             return
 
-        # 현재 화면의 데이터 수집
         input_data = {}
         for key, widgets in self.output_widgets.items():
-            # 화면에 보이는 항목만 수집
             if widgets['field'].isVisible():
                 text = widgets['field'].text() if isinstance(widgets['field'], QLineEdit) else widgets[
                     'field'].toPlainText()
                 input_data[key] = text
 
-        # 매니저에게 작업 위임 (UI 업데이트 콜백 전달)
-        QApplication.processEvents()
+        if self.auto_input_worker and self.auto_input_worker.isRunning():
+            QMessageBox.information(self, "안내", "자동 입력이 이미 실행 중입니다.")
+            return
 
-        try:
-            self.input_manager.start_input(input_data, status_callback=self.update_macro_status)
-        except Exception as e:
-            QMessageBox.critical(self, "오류", f"자동 입력 중 오류 발생: {e}")
+        self.auto_input_button.setEnabled(False)
+        self.auto_input_button.setText("자동 입력 실행 중...")
+        self.auto_input_worker = AutoInputWorker(self.input_manager, input_data)
+        self.auto_input_worker.status_changed.connect(self.update_macro_status)
+        self.auto_input_worker.error_occurred.connect(self.handle_auto_input_error)
+        self.auto_input_worker.finished.connect(self.handle_auto_input_finished)
+        self.auto_input_worker.start()
+
+    def handle_auto_input_error(self, error_message):
+        """자동 입력 스레드에서 전달된 오류를 사용자에게 노출한다."""
+        self.status_label.setText("상태: ❌ 자동 입력 오류 발생")
+        QMessageBox.critical(self, "오류", f"자동 입력 중 오류 발생: {error_message}")
+
+    def handle_auto_input_finished(self):
+        """자동 입력 종료 후 UI 상태를 원복한다."""
+        self.auto_input_button.setEnabled(True)
+        self.auto_input_button.setText("자동 입력")
+        self.auto_input_worker = None
 
     def update_macro_status(self, message):
         """매니저로부터 상태 메시지를 받아 UI 라벨 갱신"""
         self.status_label.setText(f"상태: {message}")
-        QApplication.processEvents()  # UI 즉시 갱신

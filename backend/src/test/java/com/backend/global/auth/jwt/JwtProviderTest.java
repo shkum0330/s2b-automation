@@ -21,7 +21,7 @@ class JwtProviderTest {
     private JwtProvider jwtProvider;
 
     @Test
-    @DisplayName("토큰 생성 및 검증 - memberId가 정상적으로 포함되고 추출되어야 한다")
+    @DisplayName("토큰을 생성하고 유효성을 검증할 수 있다")
     void tokenCreateAndValidateTest() {
         // given
         String email = "test@example.com";
@@ -37,7 +37,7 @@ class JwtProviderTest {
     }
 
     @Test
-    @DisplayName("Authentication 객체 생성 - DB 조회 없이 토큰만으로 MemberDetails가 만들어져야 한다")
+    @DisplayName("토큰만으로 인증 객체를 생성할 수 있다")
     void getAuthenticationTest() {
         // given
         String email = "admin@test.com";
@@ -57,3 +57,4 @@ class JwtProviderTest {
         assertThat(principal.member().getRole()).isEqualTo(role);
     }
 }
+

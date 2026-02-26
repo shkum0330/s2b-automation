@@ -40,7 +40,7 @@ class MemberServiceTest {
     }
 
     @Test
-    @DisplayName("회원 정보 조회 서비스 테스트")
+    @DisplayName("회원 정보 조회 서비스가 정상 동작한다")
     void getMemberInfo_success() {
         // given
         memberRepository.save(testMember);
@@ -86,4 +86,5 @@ class MemberServiceTest {
 //        assertThat(exception.getMessage()).isEqualTo("크레딧이 부족합니다.");
 //    }
 }
+
 

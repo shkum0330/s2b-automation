@@ -49,7 +49,7 @@ class MemberControllerTest {
     private JpaMetamodelMappingContext jpaMetamodelMappingContext;
 
     @Test
-    @DisplayName("내 정보 조회 성공")
+    @DisplayName("내 정보 조회 인터페이스가 정상 응답을 반환한다")
     void getMyInfoTest() throws Exception {
         // given
         Member member = Member.builder()

@@ -20,6 +20,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.UUID;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -39,28 +41,29 @@ class LogServiceTest {
 
     private Member memberA;
     private Member memberB;
+    private String testEmailPrefix;
 
     @BeforeEach
     void setUp() {
-        // 1. 테스트용 회원 생성
+        String suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+        testEmailPrefix = "logtest-" + suffix;
+
         memberA = memberRepository.save(Member.builder()
-                .email("userA@example.com")
+                .email(testEmailPrefix + "-userA@example.com")
                 .name("User A")
                 .provider("test")
-                .providerId("1")
+                .providerId("provider-" + suffix + "-1")
                 .role(Role.FREE_USER)
                 .build());
 
         memberB = memberRepository.save(Member.builder()
-                .email("userB@example.com")
+                .email(testEmailPrefix + "-userB@example.com")
                 .name("User B")
                 .provider("test")
-                .providerId("2")
+                .providerId("provider-" + suffix + "-2")
                 .role(Role.FREE_USER)
                 .build());
 
-        // 2. 테스트용 로그 데이터 생성
-        // Member A: 성공 로그 1개, 실패 로그 1개
         logRepository.save(GenerationLog.builder()
                 .member(memberA)
                 .success(true)
@@ -77,7 +80,6 @@ class LogServiceTest {
                 .modelName("MODEL_A_FAIL")
                 .build());
 
-        // Member B: 성공 로그 1개
         logRepository.save(GenerationLog.builder()
                 .member(memberB)
                 .success(true)
@@ -88,62 +90,50 @@ class LogServiceTest {
     }
 
     @Test
-    @DisplayName("로그 검색 - 이메일로 필터링")
+    @DisplayName("이메일 조건으로 로그를 조회할 수 있다")
     void searchLogs_filterByEmail() {
-        // given
         LogSearchRequest request = new LogSearchRequest();
-        request.setMemberEmail("userA"); // "userA"가 포함된 이메일 검색
+        request.setMemberEmail(memberA.getEmail());
 
         Pageable pageable = PageRequest.of(0, 10);
-
-        // when
         Page<LogSummaryDto> result = logService.searchLogs(request, pageable);
 
-        // then
-        assertThat(result.getTotalElements()).isEqualTo(2); // userA의 로그는 2개
-        assertThat(result.getContent()).allMatch(log -> log.getMemberEmail().contains("userA"));
+        assertThat(result.getTotalElements()).isEqualTo(2);
+        assertThat(result.getContent()).allMatch(log -> log.getMemberEmail().equals(memberA.getEmail()));
     }
 
     @Test
-    @DisplayName("로그 검색 - 성공 여부로 필터링")
+    @DisplayName("성공 여부 조건으로 로그를 조회할 수 있다")
     void searchLogs_filterBySuccess() {
-        // given
         LogSearchRequest request = new LogSearchRequest();
-        request.setSuccess(true); // 성공한 로그만 검색
+        request.setMemberEmail(testEmailPrefix);
+        request.setSuccess(true);
 
         Pageable pageable = PageRequest.of(0, 10);
-
-        // when
         Page<LogSummaryDto> result = logService.searchLogs(request, pageable);
 
-        // then
-        assertThat(result.getTotalElements()).isEqualTo(2); // userA 성공 1개 + userB 성공 1개
+        assertThat(result.getTotalElements()).isEqualTo(2);
         assertThat(result.getContent()).allMatch(LogSummaryDto::isSuccess);
     }
 
     @Test
-    @DisplayName("로그 검색 - 복합 조건(이메일 + 실패) 필터링")
+    @DisplayName("이메일과 성공 여부를 함께 조건으로 로그를 조회할 수 있다")
     void searchLogs_filterByEmailAndSuccess() {
-        // given
         LogSearchRequest request = new LogSearchRequest();
-        request.setMemberEmail("userA");
-        request.setSuccess(false); // userA의 실패 로그만 검색
+        request.setMemberEmail(memberA.getEmail());
+        request.setSuccess(false);
 
         Pageable pageable = PageRequest.of(0, 10);
-
-        // when
         Page<LogSummaryDto> result = logService.searchLogs(request, pageable);
 
-        // then
         assertThat(result.getTotalElements()).isEqualTo(1);
         assertThat(result.getContent().get(0).getMemberEmail()).isEqualTo(memberA.getEmail());
         assertThat(result.getContent().get(0).isSuccess()).isFalse();
     }
 
     @Test
-    @DisplayName("로그 상세 조회 - 성공")
+    @DisplayName("로그 상세를 정상적으로 조회할 수 있다")
     void getLogDetail_success() {
-        // given
         GenerationLog savedLog = logRepository.save(GenerationLog.builder()
                 .member(memberA)
                 .success(true)
@@ -151,10 +141,8 @@ class LogServiceTest {
                 .responseBody("detail_res")
                 .build());
 
-        // when
         LogDetailDto result = logService.getLogDetail(savedLog.getGenerationLogId());
 
-        // then
         assertThat(result).isNotNull();
         assertThat(result.getGenerationLogId()).isEqualTo(savedLog.getGenerationLogId());
         assertThat(result.getRequestBody()).isEqualTo("detail_req");
@@ -162,14 +150,16 @@ class LogServiceTest {
     }
 
     @Test
-    @DisplayName("로그 상세 조회 - 존재하지 않는 ID 예외 발생")
+    @DisplayName("존재하지 않는 로그 식별자 조회 시 예외가 발생한다")
     void getLogDetail_notFound() {
-        // given
         Long nonExistentId = 99999L;
 
-        // when & then
         assertThrows(NotFoundException.class, () -> {
             logService.getLogDetail(nonExistentId);
         });
     }
 }
+
+
+
+

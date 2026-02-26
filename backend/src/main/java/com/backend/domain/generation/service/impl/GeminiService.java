@@ -11,6 +11,7 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.util.List;
@@ -21,12 +22,13 @@ import java.util.Map;
 public class GeminiService extends AbstractGenerationService {
     @Value("${gemini.api.url}")
     private String apiUrl;
+
     @Value("${gemini.api.key}")
     private String apiKey;
 
-
     @Value("${gemini.generation.temperature:0.5}")
     private double temperature;
+
     @Value("${gemini.generation.max-output-tokens:8192}")
     private int maxOutputTokens;
 
@@ -34,13 +36,21 @@ public class GeminiService extends AbstractGenerationService {
         super(promptBuilder, objectMapper, webClient);
     }
 
-    // 요청 body  구조화를 위한 Record 클래스 정의
     @JsonInclude(JsonInclude.Include.NON_NULL)
-    private record GeminiRequest(List<Content> contents, GenerationConfig generationConfig, List<Tool> tools) {}
-    private record Content(List<Part> parts) {}
-    private record Part(String text) {}
-    private record GenerationConfig(double temperature, int maxOutputTokens) {}
-    private record Tool(Map<String, Object> google_search) {} // Google Search 툴 구조
+    private record GeminiRequest(List<Content> contents, GenerationConfig generationConfig, List<Tool> tools) {
+    }
+
+    private record Content(List<Part> parts) {
+    }
+
+    private record Part(String text) {
+    }
+
+    private record GenerationConfig(double temperature, int maxOutputTokens) {
+    }
+
+    private record Tool(Map<String, Object> google_search) {
+    }
 
     @Override
     protected String getApiUrl() {
@@ -48,10 +58,10 @@ public class GeminiService extends AbstractGenerationService {
     }
 
     @Override
-    protected HttpEntity<Object> createRequestEntity(String prompt) { // 제네릭 타입 Object로 변경
+    protected HttpEntity<Object> createRequestEntity(String prompt) {
         GenerationConfig config = new GenerationConfig(temperature, maxOutputTokens);
         Content content = new Content(List.of(new Part(prompt)));
-        Tool googleSearch = new Tool(Map.of()); // 빈 맵이면 google_search 활성화
+        Tool googleSearch = new Tool(Map.of());
 
         GeminiRequest requestBody = new GeminiRequest(
                 List.of(content),
@@ -83,11 +93,24 @@ public class GeminiService extends AbstractGenerationService {
             throw new GenerateApiException("Gemini 응답에 'parts' 필드가 없거나 비어있습니다.");
         }
 
-        JsonNode textNode = parts.get(0).path("text");
-        if (textNode.isMissingNode()) {
+        StringBuilder combinedText = new StringBuilder();
+        for (JsonNode part : parts) {
+            JsonNode textNode = part.path("text");
+            if (!textNode.isMissingNode()) {
+                String partText = textNode.asText();
+                if (StringUtils.hasText(partText)) {
+                    if (!combinedText.isEmpty()) {
+                        combinedText.append('\n');
+                    }
+                    combinedText.append(partText.trim());
+                }
+            }
+        }
+
+        if (combinedText.isEmpty()) {
             throw new GenerateApiException("Gemini 응답에 'text' 필드가 없습니다.");
         }
 
-        return textNode.asText().replace("```json", "").replace("```", "").trim();
+        return combinedText.toString();
     }
 }

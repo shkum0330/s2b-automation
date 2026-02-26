@@ -14,9 +14,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
-import reactor.core.publisher.Mono;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
@@ -63,24 +63,27 @@ public class PaymentService {
         Payment payment = Payment.builder()
                 .member(member)
                 .amount(amount)
-                .orderName(orderName) // [추가]
+                .orderName(orderName)
                 .orderId(orderId)
-                .paymentKey(null) // 아직 승인 전이므로 null
+                .paymentKey(null)
                 .status("READY")
                 .build();
 
         return paymentRepository.save(payment);
     }
 
-    public Mono<TossConfirmResponseDto> confirmPayment(String paymentKey, String orderId, Long amount) {
-
+    @Transactional(propagation = Propagation.SUPPORTS)
+    public TossConfirmResponseDto confirmPayment(String paymentKey, String orderId, Long amount) {
         Payment payment = paymentRepository.findByOrderId(orderId)
                 .orElseThrow(() -> new NotFoundException("주문 정보를 찾을 수 없습니다. orderId=" + orderId));
 
-        // 금액 검증
+        if (!"READY".equals(payment.getStatus())) {
+            throw new IllegalArgumentException("처리 가능한 결제 상태가 아닙니다.");
+        }
+
         if (!Objects.equals(payment.getAmount(), amount)) {
-            payment.failPayment(); // 금액 불일치 시 결제 중단 처리
-            return Mono.error(new IllegalArgumentException("주문 금액이 일치하지 않습니다."));
+            markPaymentAsFailed(payment);
+            throw new IllegalArgumentException("주문 금액이 일치하지 않습니다.");
         }
 
         Map<String, Object> body = Map.of(
@@ -89,43 +92,83 @@ public class PaymentService {
                 "amount", amount
         );
 
-        // 승인 API 호출
-        return tossWebClient.post()
-                .uri("/v1/payments/confirm")
-                .bodyValue(body)
-                .retrieve()
-                .bodyToMono(TossConfirmResponseDto.class)
-                .doOnSuccess(response -> {
-                    if (response != null && "DONE".equals(response.getStatus())) {
-                        handleSuccessfulPayment(payment, response);
-                    }
-                })
-                .doOnError(error -> {
-                    log.error("결제 승인 실패: {}", error.getMessage());
-                    // 필요하다면 여기서 결제 실패 상태로 업데이트
-                });
+        try {
+            TossConfirmResponseDto response = tossWebClient.post()
+                    .uri("/v1/payments/confirm")
+                    .bodyValue(body)
+                    .retrieve()
+                    .bodyToMono(TossConfirmResponseDto.class)
+                    .block();
+
+            return validateAndApplyPayment(payment, orderId, amount, response);
+        } catch (Exception e) {
+            log.error("결제 확인 실패: {}", e.getMessage());
+            if (e instanceof RuntimeException runtimeException) {
+                throw runtimeException;
+            }
+            throw new IllegalStateException("결제 확인 처리 중 오류가 발생했습니다.", e);
+        }
+    }
+
+    private TossConfirmResponseDto validateAndApplyPayment(
+            Payment payment,
+            String orderId,
+            Long amount,
+            TossConfirmResponseDto response
+    ) {
+        if (response == null) {
+            markPaymentAsFailed(payment);
+            throw new IllegalArgumentException("결제 확인 응답이 비어 있습니다.");
+        }
+
+        if (!Objects.equals(response.getOrderId(), orderId)
+                || !Objects.equals(response.getTotalAmount(), amount)) {
+            markPaymentAsFailed(payment);
+            throw new IllegalArgumentException("결제 검증에 실패했습니다.");
+        }
+
+        if (!"DONE".equals(response.getStatus())) {
+            markPaymentAsFailed(payment);
+            throw new IllegalArgumentException("결제가 완료 상태가 아닙니다.");
+        }
+
+        handleSuccessfulPayment(payment, response);
+        return response;
     }
 
     private void handleSuccessfulPayment(Payment payment, TossConfirmResponseDto response) {
-        // 결제 정보 업데이트
         payment.completePayment(response.getPaymentKey());
+        paymentRepository.save(payment);
 
-        // 멤버십 적용
-        Member member = payment.getMember();
+        Long memberId = payment.getMember().getMemberId();
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new NotFoundException("회원 정보를 찾을 수 없습니다. memberId=" + memberId));
+
         Long amount = payment.getAmount();
         Role newRole = getRoleByAmount(amount);
 
         if (newRole != null) {
             member.updateMembership(newRole, SUBSCRIPTION_DAYS);
             memberRepository.save(member);
-            log.info("결제 성공: 사용자(ID={}) 등급이 {}로 변경되었습니다.", member.getMemberId(), newRole);
+            log.info("결제 성공: 사용자 ID={} 등급이 {}로 변경되었습니다.", member.getMemberId(), newRole);
         }
     }
 
+    private void markPaymentAsFailed(Payment payment) {
+        payment.failPayment();
+        paymentRepository.save(payment);
+    }
+
     private Role getRoleByAmount(Long amount) {
-        if (amount == 29900L) return Role.PLAN_30K;
-        if (amount == 49900L) return Role.PLAN_50K;
-        if (amount == 100000L) return Role.PLAN_100K;
+        if (amount == 29900L) {
+            return Role.PLAN_30K;
+        }
+        if (amount == 49900L) {
+            return Role.PLAN_50K;
+        }
+        if (amount == 100000L) {
+            return Role.PLAN_100K;
+        }
         return null;
     }
 

@@ -3,6 +3,7 @@ package com.backend.domain.payment.service;
 import com.backend.domain.member.entity.Member;
 import com.backend.domain.member.entity.Role;
 import com.backend.domain.member.repository.MemberRepository;
+import com.backend.domain.payment.dto.TossConfirmResponseDto;
 import com.backend.domain.payment.entity.Payment;
 import com.backend.domain.payment.repository.PaymentRepository;
 import com.backend.global.exception.NotFoundException;
@@ -19,11 +20,11 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.transaction.annotation.Transactional;
-import reactor.test.StepVerifier;
 
 import java.io.IOException;
 import java.time.LocalDate;
 import java.util.Map;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -68,21 +69,20 @@ class PaymentServiceTest {
 
     @BeforeEach
     void setUp() {
-        paymentRepository.deleteAll();
-        memberRepository.deleteAll();
+        String suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 12);
 
         testMember = Member.builder()
-                .email("test@example.com")
+                .email("test-" + suffix + "@example.com")
                 .name("테스트유저")
                 .provider("TEST")
-                .providerId("test-provider-id")
+                .providerId("tp-" + suffix)
                 .role(Role.FREE_USER)
                 .build();
         memberRepository.save(testMember);
     }
 
     @Test
-    @DisplayName("결제 요청 성공: 유효한 금액과 주문명으로 요청 시 READY 상태의 Payment가 저장된다")
+    @DisplayName("유효한 결제 요청은 준비 상태로 저장된다")
     void requestPayment_success() {
         // given
         Long validAmount = 29900L;
@@ -105,7 +105,7 @@ class PaymentServiceTest {
     }
 
     @Test
-    @DisplayName("결제 요청 실패: 유효하지 않은 금액으로 요청 시 예외 발생")
+    @DisplayName("유효하지 않은 결제 금액은 예외가 발생한다")
     void requestPayment_fail_invalidAmount() {
         // given
         Long invalidAmount = 500L; // 정의되지 않은 금액
@@ -122,7 +122,7 @@ class PaymentServiceTest {
     // --- 2. confirmPayment 테스트 ---
 
     @Test
-    @DisplayName("결제 승인 성공: Toss API 승인 후 DB 업데이트 및 멤버십 등급 상향")
+    @DisplayName("결제 승인 성공 시 결제 상태와 멤버십이 갱신된다")
     void confirmPayment_success() throws JsonProcessingException {
         // given
         // 1. READY 상태의 결제 데이터 생성
@@ -130,7 +130,7 @@ class PaymentServiceTest {
         String orderName = "30일 20개 플랜";
         Payment readyPayment = paymentService.requestPayment(testMember, amount, orderName);
         String orderId = readyPayment.getOrderId();
-        String paymentKey = "test_payment_key_success";
+        String paymentKey = "test_payment_key_success_" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
 
         // 2. MockWebServer 응답 설정 (Toss API 모킹)
         String mockResponseBody = objectMapper.writeValueAsString(Map.of(
@@ -146,13 +146,12 @@ class PaymentServiceTest {
                 .setBody(mockResponseBody));
 
         // when
-        StepVerifier.create(paymentService.confirmPayment(paymentKey, orderId, amount))
-                .expectNextMatches(responseDto ->
-                        responseDto.getStatus().equals("DONE") &&
-                                responseDto.getOrderId().equals(orderId))
-                .verifyComplete();
+        TossConfirmResponseDto responseDto = paymentService.confirmPayment(paymentKey, orderId, amount);
 
         // then
+        assertThat(responseDto.getStatus()).isEqualTo("DONE");
+        assertThat(responseDto.getOrderId()).isEqualTo(orderId);
+
         // 1. Payment 상태가 DONE으로 변경되었는지 확인
         Payment confirmedPayment = paymentRepository.findByOrderId(orderId).orElseThrow();
         assertThat(confirmedPayment.getStatus()).isEqualTo("DONE");
@@ -165,7 +164,7 @@ class PaymentServiceTest {
     }
 
     @Test
-    @DisplayName("결제 승인 실패: 요청 금액 불일치 시 ABORTED 상태로 변경되고 예외 발생")
+    @DisplayName("요청 금액이 다르면 결제는 중단 상태가 되고 예외가 발생한다")
     void confirmPayment_fail_amountMismatch() {
         // given
         Long originalAmount = 29900L;
@@ -176,12 +175,11 @@ class PaymentServiceTest {
         String orderId = readyPayment.getOrderId();
         String paymentKey = "test_payment_key_fail";
 
-        // when & then (StepVerifier로 Mono 에러 검증)
-        StepVerifier.create(paymentService.confirmPayment(paymentKey, orderId, wrongAmount))
-                .expectErrorMatches(throwable ->
-                        throwable instanceof IllegalArgumentException &&
-                                throwable.getMessage().equals("주문 금액이 일치하지 않습니다."))
-                .verify();
+        // when & then
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
+            paymentService.confirmPayment(paymentKey, orderId, wrongAmount);
+        });
+        assertThat(exception.getMessage()).isEqualTo("주문 금액이 일치하지 않습니다.");
 
         // then
         // 금액 불일치 시 failPayment()가 호출되어 status가 ABORTED로 변경되었는지 확인
@@ -190,7 +188,7 @@ class PaymentServiceTest {
     }
 
     @Test
-    @DisplayName("결제 승인 실패: 존재하지 않는 주문 ID 요청 시 예외 발생")
+    @DisplayName("존재하지 않는 주문 식별자로 승인 요청하면 예외가 발생한다")
     void confirmPayment_fail_notFound() {
         // given
         String nonExistentOrderId = "unknown_order_id";
@@ -204,3 +202,8 @@ class PaymentServiceTest {
         });
     }
 }
+
+
+
+
+

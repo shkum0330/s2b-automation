@@ -25,11 +25,11 @@ management:
   endpoints:
     web:
       exposure:
-        include: health, info, prometheus, loggers, metrics
+        include: health, info
 
   endpoint:
     health:
-      show-details: always
+      show-details: when_authorized
   info:
     java:
       enabled: true
@@ -57,6 +57,7 @@ kakao:
   client-id: ${KAKAO_CLIENT_ID}
   redirect-uri: ${KAKAO_REDIRECT_URI}
   client-secret: ${KAKAO_CLIENT_SECRET}
+  allowed-redirect-uris: ${KAKAO_ALLOWED_REDIRECT_URIS:}
 
 toss:
   client-key: ${TOSS_CLIENT_KEY}
